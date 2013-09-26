@@ -1,0 +1,258 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of SFLOWTOOL</TITLE>
+</HEAD><BODY>
+<H1>SFLOWTOOL</H1>
+Section: System administration commands (8)<BR>Updated: September 26, 2013<BR><A HREF="#index">Index</A>
+<A HREF="../index.html">Return to Main Contents</A><HR>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+sflowtool - Command line utility for decoding and analyzing sflow data
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<DL COMPACT>
+<DT>
+<B>sflowtool</B> [<B>&nbsp;OPTIONS&nbsp;</B>]
+</DL>
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+<P>
+<DD>This manual page documents briefly the <B>sflowtool</B> command.
+<P>
+This manual page was written for the Debian(TM) distribution because the original program does not have a manual page.
+<P>
+<B>sflowtool</B> is a program that interfaces to utilities such as <B><A HREF="../man8/tcpdump.8.html">tcpdump</A></B>(8), <B><A HREF="../man8/ntop.8.html">ntop</A></B>(8) and <B><A HREF="../man8/snort.8.html">snort</A></B>(8) for detailed packet tracing and analysis, NetFlow compatible collectors for IP flow accounting, and provides text based output that can be used in scripts to provide customized analysis and reporting and for integrating with other tools such as <B><A HREF="../man1/mrtg.1.html">mrtg</A></B>(1) or <B><A HREF="../man1/rrdtool.1.html">rrdtool</A></B>(1).
+<A NAME="lbAE">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<P>
+
+<B>-p </B><B></B><I>port</I>
+<DL COMPACT><DT><DD>
+Listen on port.
+</DL>
+
+<P>
+
+<B>-f </B><B></B><I>host/port</I>
+<DL COMPACT><DT><DD>
+Forward sflow to another collector (repeat for multiple collectors).
+</DL>
+
+<P>
+
+<B>-l</B>
+<DL COMPACT><DT><DD>
+Output in line-by-line format.
+</DL>
+
+<P>
+
+<B>-H</B>
+<DL COMPACT><DT><DD>
+Output HTTP common log file format.
+</DL>
+
+<P>
+
+<B>-t</B>
+<DL COMPACT><DT><DD>
+Output in binary
+<B><A HREF="../man8/tcpdump.8.html">tcpdump</A></B>(8)
+format.
+</DL>
+
+<P>
+
+<B>-r </B><B></B><I>file</I>
+<DL COMPACT><DT><DD>
+Read binary
+<B><A HREF="../man8/tcpdump.8.html">tcpdump</A></B>(8)
+format.
+</DL>
+
+<P>
+
+<B>-x</B>
+<DL COMPACT><DT><DD>
+Remove all IPv4 content.
+</DL>
+
+<P>
+
+<B>-z </B><B></B><I>pad</I>
+<DL COMPACT><DT><DD>
+Extend
+<B><A HREF="../man8/tcpdump.8.html">tcpdump</A></B>(8)
+pkthdr with this many zeros e.g. try -z 8 for
+<B><A HREF="../man8/tcpdump.8.html">tcpdump</A></B>(8)
+on Red Hat Linux 6.2.
+</DL>
+
+<P>
+
+<B>-c </B><B></B><I>hostname_or_IP</I>
+<DL COMPACT><DT><DD>
+Netflow output: send to collector host.
+</DL>
+
+<P>
+
+<B>-d </B><B></B><I>port</I>
+<DL COMPACT><DT><DD>
+Netflow output: send to collector UDP port.
+</DL>
+
+<P>
+
+<B>-e</B>
+<DL COMPACT><DT><DD>
+Netflow output: collector peer_as (default = origin_as).
+</DL>
+
+<P>
+
+<B>-s</B>
+<DL COMPACT><DT><DD>
+Netflow output: disable scaling of output by sampling rate.
+</DL>
+
+<P>
+
+<B>-S</B>
+<DL COMPACT><DT><DD>
+Netflow output: spoof source of packets to input agent IP.
+</DL>
+
+<P>
+
+<B>+v </B><B></B><I>vlans</I>
+<DL COMPACT><DT><DD>
+Include vlans (e.g. +v 0-20,4091).
+</DL>
+
+<P>
+
+<B>-v </B><B></B><I>vlans</I>
+<DL COMPACT><DT><DD>
+Exclude vlans.
+</DL>
+
+<P>
+
+<B>-4</B>
+<DL COMPACT><DT><DD>
+Listen on IPv4 socket only.
+</DL>
+
+<P>
+
+<B>-6</B>
+<DL COMPACT><DT><DD>
+Listen on IPv6 socket only.
+</DL>
+
+<P>
+
+<B>+4</B>
+<DL COMPACT><DT><DD>
+Listen on both IPv4 and IPv6 sockets.
+</DL>
+
+<P>
+
+<B></B><I>any-other-argument</I>
+<DL COMPACT><DT><DD>
+Show summary of options.
+</DL>
+
+<A NAME="lbAF">&nbsp;</A>
+<H2>BUGS</H2>
+
+<P>
+Report any upstream bugs to InMon (<A HREF="http://www.inmon.com">www.inmon.com</A>) via the address provided in the AUTHORS file (Neil Mckee &lt;<A HREF="mailto:neil.mckee@inmon.com">neil.mckee@inmon.com</A>&gt;).
+<A NAME="lbAG">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<B><A HREF="../man1/mrtg.1.html">mrtg</A></B>(1), <B><A HREF="../man8/ntop.8.html">ntop</A></B>(8), <B><A HREF="../man1/rrdtool.1.html">rrdtool</A></B>(1), <B><A HREF="../man8/snort.8.html">snort</A></B>(8), <B><A HREF="../man8/tcpdump.8.html">tcpdump</A></B>(8)
+<A NAME="lbAH">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+<P>
+
+<B>Rowan Thorpe</B> &lt;<A HREF="mailto:rowan@rowanthorpe.com">rowan@rowanthorpe.com</A>&gt;
+<DL COMPACT><DT><DD>
+Wrote this manpage for the Debian(TM) system.
+</DL>
+
+<A NAME="lbAI">&nbsp;</A>
+<H2>COPYRIGHT</H2>
+
+<BR>
+
+Copyright &#169; 2013 Rowan&nbsp;Thorpe
+<BR>
+
+<P>
+
+This manual page was written for the
+Debian(TM)
+system (and may be used by others).
+<P>
+
+Permission is granted to copy, distribute and/or modify this document under the terms of the
+GNU
+General Public License, Version 2 or (at your option) any later version published by the Free Software Foundation.
+<P>
+
+On
+Debian(TM)
+systems, the complete text of the
+GNU&nbsp;GPL
+can be found in
+/usr/share/common-licenses/GPL.
+<P>
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">OPTIONS</A><DD>
+<DT><A HREF="#lbAF">BUGS</A><DD>
+<DT><A HREF="#lbAG">SEE ALSO</A><DD>
+<DT><A HREF="#lbAH">AUTHOR</A><DD>
+<DT><A HREF="#lbAI">COPYRIGHT</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="/cgi-bin/man/man2html">man2html</A>,
+using the manual pages.<BR>
+Time: 06:13:10 GMT, September 26, 2013
+</BODY>
+</HTML>

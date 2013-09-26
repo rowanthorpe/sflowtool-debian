@@ -1,0 +1,1 @@
+extend-diff-ignore = "(^|/)(config\.(sub|guess|log|status|h\.in)|configure|Makefile(|\.in)|compile|aclocal\.m4)$"

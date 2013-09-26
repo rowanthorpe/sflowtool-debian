@@ -1,0 +1,144 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          sflowtool-forwarder
+# Required-Start:    $local_fs $network $remote_fs $syslog
+# Required-Stop:     $local_fs $network $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Daemon for forwarding sflow data to other destination(s)/port(s)
+# Description:       This daemon forwards sflow data from one incoming port to
+#                    another (or multiple) destination(s) and/or port(s).
+### END INIT INFO
+
+# Author: Rowan Thorpe <rowan@rowanthorpe.com>
+
+# Do NOT "set -e"
+
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+DESC='Daemon for forwarding sflow data to other destination(s)/port(s)'
+NAME='sflowtool-forwarder'
+DAEMON='/usr/bin/sflowtool'
+PIDFILE="/var/run/$NAME.pid"
+SCRIPTNAME="/etc/init.d/$NAME"
+# override the below settings in /etc/default/sflowtool-forwarder
+DAEMON_ARGS=''
+RUN_DAEMON='no'
+
+# Exit if the package is not installed
+test -x "$DAEMON" || exit 0
+
+# Read configuration variable file if it is present
+if test -r "/etc/default/$NAME"; then
+    . "/etc/default/$NAME" || { printf 'Failed to source /etc/default/%s\n' "$NAME"; exit 1; }
+fi
+
+# Load the VERBOSE setting and other rcS variables
+. /lib/init/vars.sh
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.2-14) to ensure that this file is present
+# and status_of_proc is working.
+. /lib/lsb/init-functions || { printf 'Failed to source /lib/lsb/init-functions\n'; exit 1; }
+
+#
+# Function that starts the daemon/service
+#
+do_start() {
+    start-stop-daemon --start --quiet --pidfile "$PIDFILE" --exec "$DAEMON" --test >/dev/null || return 1
+    start-stop-daemon --start --quiet --pidfile "$PIDFILE" --exec "$DAEMON" -- $DAEMON_ARGS || return 2
+    sleep 1
+    #TODO:
+    # Add code here, that waits for the process to be ready to handle requests from
+    # services started subsequently which depend on this one, rather than just doing "sleep 1".
+}
+
+#
+# Function that stops the daemon/service
+#
+do_stop() {
+    start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile "$PIDFILE" --exec "$DAEMON"
+    RETVAL=$?
+    test 2 -ne $RETVAL || return 2
+    start-stop-daemon --stop --quiet --oknodo --retry=0/30/KILL/5 --exec "$DAEMON"
+    test 2 -ne $? || return 2
+    rm -f "$PIDFILE"
+    return $RETVAL
+}
+
+#
+# Function that stops then starts the daemon/service
+#
+do_restart() {
+    do_stop
+    case "$?" in
+        0|1)
+            do_start
+            case "$?" in
+                0) log_end_msg 0 ;;
+                1) log_end_msg 1 ;; # Old process is still running
+                *) log_end_msg 1 ;; # Failed to start
+            esac
+            ;;
+        *)
+            # Failed to stop
+            log_end_msg 1
+            ;;
+    esac
+}
+
+#
+# Function that sends a SIGHUP to the daemon/service
+#
+do_reload() {
+    start-stop-daemon --stop --signal 1 --quiet --pidfile "$PIDFILE" --exec "$DAEMON"
+}
+
+case "$1" in
+    start)
+        if ! test 'yes' = "$RUN_DAEMON"; then
+            log_action_msg "Not starting $NAME (Disabled in /etc/default/$NAME)."
+            log_end_msg 0
+        fi
+        if test -z "$DAEMON_ARGS"; then
+            log_action_msg "Not starting $NAME (\$DAEMON_ARGS must be set in /etc/default/$NAME)."
+            log_end_msg 0
+        fi
+        test 'no' = "$VERBOSE" || log_daemon_msg "Starting $DESC " "$NAME"
+        do_start
+        case $? in
+            0|1) log_end_msg 0;;
+            2) log_end_msg 1;;
+        esac
+        ;;
+    stop)
+        test 'no' = "$VERBOSE" || log_daemon_msg "Stopping $DESC " "$NAME"
+        do_stop
+        case $? in
+            0|1) log_end_msg 0;;
+            2) log_end_msg 1;;
+        esac
+        ;;
+    status)
+        status_of_proc -p "$PIDFILE" "$DAEMON" "$NAME"
+        exit $?
+        ;;
+    #reload|force-reload)
+    #    log_daemon_msg "Reloading $DESC" "$NAME"
+    #    do_reload
+    #    log_end_msg $?
+    #    ;;
+    #restart)
+    restart|force-reload)
+        log_daemon_msg "Restarting $DESC " "$NAME"
+        do_restart
+        log_end_msg $?
+        ;;
+    *)
+        #printf 'Usage: %s {start|stop|status|restart|reload|force-reload}\n' "$SCRIPTNAME" >&2
+        printf 'Usage: %s {start|stop|status|restart|force-reload}\n' "$SCRIPTNAME" >&2
+        exit 3
+        ;;
+esac
+
+:

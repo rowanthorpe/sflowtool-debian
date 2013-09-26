@@ -1,0 +1,176 @@
+'\" t
+.\"     Title: SFLOWTOOL
+.\"    Author: Rowan Thorpe <rowan@rowanthorpe.com>
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: September 26, 2013
+.\"    Manual: System administration commands and daemons
+.\"    Source: sflowtool 3.28
+.\"  Language: English
+.\"
+.TH "SFLOWTOOL" "8" "September 26, 2013" "sflowtool 3\&.28" "System administration commands"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+sflowtool \- Command line utility for decoding and analyzing sflow data
+.SH "SYNOPSIS"
+.HP \w'\fBsflowtool\fR\ 'u
+\fBsflowtool\fR [\fB\ OPTIONS\ \fR]
+.SH "DESCRIPTION"
+.sp
+This manual page documents briefly the \fBsflowtool\fR command\&.
+.sp
+This manual page was written for the Debian(TM) distribution because the original program does not have a manual page\&.
+.sp
+\fBsflowtool\fR is a program that interfaces to utilities such as \fBtcpdump\fR(8), \fBntop\fR(8) and \fBsnort\fR(8) for detailed packet tracing and analysis, NetFlow compatible collectors for IP flow accounting, and provides text based output that can be used in scripts to provide customized analysis and reporting and for integrating with other tools such as \fBmrtg\fR(1) or \fBrrdtool\fR(1)\&.
+.SH "OPTIONS"
+.PP
+\fB\-p \fR\fB\fIport\fR\fR
+.RS 4
+Listen on port\&.
+.RE
+.PP
+\fB\-f \fR\fB\fIhost/port\fR\fR
+.RS 4
+Forward sflow to another collector (repeat for multiple collectors)\&.
+.RE
+.PP
+\fB\-l\fR
+.RS 4
+Output in line\-by\-line format\&.
+.RE
+.PP
+\fB\-H\fR
+.RS 4
+Output HTTP common log file format\&.
+.RE
+.PP
+\fB\-t\fR
+.RS 4
+Output in binary
+\fBtcpdump\fR(8)
+format\&.
+.RE
+.PP
+\fB\-r \fR\fB\fIfile\fR\fR
+.RS 4
+Read binary
+\fBtcpdump\fR(8)
+format\&.
+.RE
+.PP
+\fB\-x\fR
+.RS 4
+Remove all IPv4 content\&.
+.RE
+.PP
+\fB\-z \fR\fB\fIpad\fR\fR
+.RS 4
+Extend
+\fBtcpdump\fR(8)
+pkthdr with this many zeros e\&.g\&. try \-z 8 for
+\fBtcpdump\fR(8)
+on Red Hat Linux 6\&.2\&.
+.RE
+.PP
+\fB\-c \fR\fB\fIhostname_or_IP\fR\fR
+.RS 4
+Netflow output: send to collector host\&.
+.RE
+.PP
+\fB\-d \fR\fB\fIport\fR\fR
+.RS 4
+Netflow output: send to collector UDP port\&.
+.RE
+.PP
+\fB\-e\fR
+.RS 4
+Netflow output: collector peer_as (default = origin_as)\&.
+.RE
+.PP
+\fB\-s\fR
+.RS 4
+Netflow output: disable scaling of output by sampling rate\&.
+.RE
+.PP
+\fB\-S\fR
+.RS 4
+Netflow output: spoof source of packets to input agent IP\&.
+.RE
+.PP
+\fB+v \fR\fB\fIvlans\fR\fR
+.RS 4
+Include vlans (e\&.g\&. +v 0\-20,4091)\&.
+.RE
+.PP
+\fB\-v \fR\fB\fIvlans\fR\fR
+.RS 4
+Exclude vlans\&.
+.RE
+.PP
+\fB\-4\fR
+.RS 4
+Listen on IPv4 socket only\&.
+.RE
+.PP
+\fB\-6\fR
+.RS 4
+Listen on IPv6 socket only\&.
+.RE
+.PP
+\fB+4\fR
+.RS 4
+Listen on both IPv4 and IPv6 sockets\&.
+.RE
+.PP
+\fB\fIany\-other\-argument\fR\fR
+.RS 4
+Show summary of options\&.
+.RE
+.SH "BUGS"
+.sp
+Report any upstream bugs to InMon (www.inmon.com) via the address provided in the AUTHORS file (Neil Mckee <neil\&.mckee@inmon\&.com>)\&.
+.SH "SEE ALSO"
+\fBmrtg\fR(1), \fBntop\fR(8), \fBrrdtool\fR(1), \fBsnort\fR(8), \fBtcpdump\fR(8)
+.SH "AUTHOR"
+.PP
+\fBRowan Thorpe\fR <\&rowan@rowanthorpe\&.com\&>
+.RS 4
+Wrote this manpage for the Debian(TM) system\&.
+.RE
+.SH "COPYRIGHT"
+.br
+Copyright \(co 2013 Rowan\ \&Thorpe
+.br
+.PP
+This manual page was written for the
+Debian(TM)
+system (and may be used by others)\&.
+.PP
+Permission is granted to copy, distribute and/or modify this document under the terms of the
+GNU
+General Public License, Version 2 or (at your option) any later version published by the Free Software Foundation\&.
+.PP
+On
+Debian(TM)
+systems, the complete text of the
+GNU\ \&GPL
+can be found in
+/usr/share/common\-licenses/GPL\&.
+.sp

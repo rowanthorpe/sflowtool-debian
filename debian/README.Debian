@@ -1,0 +1,23 @@
+sflowtool for Debian
+--------------------
+
+ * For upstream information visit http://www.inmon.com/technology/sflowTools.php
+
+ * For Debian an init script "sflowtool-forwarder" has been added, which can be
+   configured to run an sflowtool daemon to forward one sflow source to various
+   destinations and/or ports. It is disabled by default by a setting in
+   /etc/default/sflowtool-forwarder.
+
+ * For Debian a manpage has been added: "man 8 sflowtool".
+
+ * To rebuild manpage formats:
+
+   xsltproc --nonet \
+     /usr/share/xml/docbook/stylesheet/docbook-xsl/manpages/docbook.xsl \
+     sflowtool.8.xml
+
+   man2html -r sflowtool.8 | sed -e '/^Content-type/,/^$/ d' >sflowtool.8.html
+
+   man -t ./sflowtool.8 | ps2pdf - >sflowtool.8.pdf
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>, Fri, 26 Sep 2013 08:30:05 +0300

@@ -1,0 +1,21 @@
+Source: sflowtool
+Section: non-free/net
+Priority: optional
+Maintainer: Rowan Thorpe <rowan@rowanthorpe.com>
+Build-Depends: debhelper (>= 9), autotools-dev, dh-autoreconf
+Standards-Version: 3.9.4
+Homepage: http://www.inmon.com/technology/sflowTools.php
+#Vcs-Git: git://anonscm.debian.org/collab-maint/sflowtool.git
+#Vcs-Browser: http://anonscm.debian.org/?p=collab-maint/sflowtool.git;a=summary
+XS-Autobuild: yes
+
+Package: sflowtool
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Replaces: sflowtool (<< 3.28-1)
+Description: Command line utility for decoding and analyzing sflow data
+ sflowtool interfaces to utilities such as tcpdump, ntop and Snort for
+ detailed packet tracing and analysis, NetFlow compatible collectors for IP
+ flow accounting, and provides text based output that can be used in scripts
+ to provide customized analysis and reporting and for integrating with other
+ tools such as MRTG or rrdtool.

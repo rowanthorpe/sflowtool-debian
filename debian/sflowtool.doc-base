@@ -1,0 +1,13 @@
+Document: sflowtool
+Title: Debian sflowtool Manual
+Author: Rowan Thorpe
+Abstract: This manual describes what sflowtool is
+ and how it can be used.
+Section: Network/Monitoring
+
+Format: PDF
+Files: /usr/share/doc/sflowtool/sflowtool.8.pdf.gz
+
+Format: HTML
+Index: /usr/share/doc/sflowtool/sflowtool.8.html
+Files: /usr/share/doc/sflowtool/sflowtool.8.html

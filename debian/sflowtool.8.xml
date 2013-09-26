@@ -1,0 +1,193 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+
+<!ENTITY dhdate          "September 26, 2013">
+<!ENTITY dhyears         "<year>2013</year>">
+<!ENTITY dhversion       "3.28">
+<!ENTITY dhemail         "<email>rowan@rowanthorpe.com</email>">
+<!ENTITY dhupstreamemail "<email>neil.mckee@inmon.com</email>">
+<!ENTITY dhfirstname     "<firstname>Rowan</firstname>">
+<!ENTITY dhsurname       "<surname>Thorpe</surname>">
+<!ENTITY dhupstreamname  "Neil Mckee">
+<!ENTITY dhupstreamco    'InMon (<link href="http//www.inmon.com">www.inmon.com</link>)'>
+<!ENTITY dhpackage       "sflowtool">
+<!ENTITY dhpackagecaps   "SFLOWTOOL">
+<!ENTITY dhtitle         "&dhpackage; User Manual">
+<!ENTITY dhpurpose       "Command line utility for decoding and analyzing sflow data">
+<!ENTITY dhmanvolnum     "<manvolnum>8</manvolnum>">
+<!ENTITY dhmanvolname    "System administration commands and daemons">
+
+<!ENTITY dhdistro        '<productname class="trade">Debian</productname>'>
+<!ENTITY gnu             "<acronym>GNU</acronym>">
+<!ENTITY gpl             "<acronym>GPL</acronym>">
+<!ENTITY dhusername      "&dhfirstname;&nbsp;&dhsurname;">
+
+]>
+
+<refentry>
+ <refentryinfo>
+  <date>&dhdate;</date>
+  <title>&dhtitle;</title>
+  <productname>&dhpackage;</productname>
+  <authorgroup>
+   <author>
+    &dhfirstname;
+    &dhsurname;
+    <contrib>Wrote this manpage for the &dhdistro; system.</contrib>
+    <address>&dhemail;</address>
+   </author>
+  </authorgroup>
+  <copyright>
+   &dhyears;
+   <holder>&dhusername;</holder>
+  </copyright>
+  <legalnotice>
+   <para>This manual page was written for the &dhdistro; system
+    (and may be used by others).</para>
+   <para>Permission is granted to copy, distribute and/or modify this
+    document under the terms of the &gnu; General Public License,
+    Version 2 or (at your option) any later version published by
+    the Free Software Foundation.</para>
+   <para>On &dhdistro; systems, the complete text of the &gnu;&nbsp;&gpl;
+    can be found in
+    <filename>/usr/share/common-licenses/GPL</filename>.</para>
+  </legalnotice>
+ </refentryinfo>
+ <refmeta>
+  <refentrytitle>&dhpackagecaps;</refentrytitle>
+  &dhmanvolnum;
+  <refmiscinfo class="manual">&dhmanvolname;</refmiscinfo>
+  <refmiscinfo class="source">&dhpackage;</refmiscinfo>
+  <refmiscinfo class="version">&dhversion;</refmiscinfo>
+ </refmeta>
+ <refnamediv>
+  <refname>&dhpackage;</refname>
+  <refpurpose>&dhpurpose;</refpurpose>
+ </refnamediv>
+ <refsynopsisdiv>
+  <cmdsynopsis>
+   <command>&dhpackage;</command>
+   <arg choice="opt"><option> OPTIONS </option></arg>
+  </cmdsynopsis>
+ </refsynopsisdiv>
+ <refsect1 id="description">
+  <title>DESCRIPTION</title>
+  <simpara>
+   This manual page documents briefly the <command>&dhpackage;</command> command.
+  </simpara>
+  <simpara>
+   This manual page was written for the &dhdistro; distribution
+   because the original program does not have a manual page.
+  </simpara>
+  <simpara>
+   <command>&dhpackage;</command> is a program that interfaces to utilities such as
+   <citerefentry><refentrytitle>tcpdump</refentrytitle><manvolnum>8</manvolnum></citerefentry>,
+   <citerefentry><refentrytitle>ntop</refentrytitle><manvolnum>8</manvolnum></citerefentry> and
+   <citerefentry><refentrytitle>snort</refentrytitle><manvolnum>8</manvolnum></citerefentry> for detailed packet
+   tracing and analysis, NetFlow compatible collectors for IP flow accounting, and provides
+   text based output that can be used in scripts to provide customized analysis and
+   reporting and for integrating with other tools such as
+   <citerefentry><refentrytitle>mrtg</refentrytitle><manvolnum>1</manvolnum></citerefentry> or
+   <citerefentry><refentrytitle>rrdtool</refentrytitle><manvolnum>1</manvolnum></citerefentry>.
+  </simpara>
+ </refsect1>
+ <refsect1 id="options">
+  <title>OPTIONS</title>
+  <variablelist>
+   <varlistentry>
+    <term><option>-p <replaceable>port</replaceable></option></term>
+    <listitem><simpara>Listen on port.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-f <replaceable>host/port</replaceable></option></term>
+    <listitem><simpara>Forward sflow to another collector (repeat for multiple collectors).</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-l</option></term>
+    <listitem><simpara>Output in line-by-line format.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-H</option></term>
+    <listitem><simpara>Output HTTP common log file format.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-t</option></term>
+    <listitem><simpara>Output in binary <citerefentry><refentrytitle>tcpdump</refentrytitle><manvolnum>8</manvolnum></citerefentry> format.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-r <replaceable>file</replaceable></option></term>
+    <listitem><simpara>Read binary <citerefentry><refentrytitle>tcpdump</refentrytitle><manvolnum>8</manvolnum></citerefentry> format.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-x</option></term>
+    <listitem><simpara>Remove all IPv4 content.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-z <replaceable>pad</replaceable></option></term>
+    <listitem><simpara>Extend <citerefentry><refentrytitle>tcpdump</refentrytitle><manvolnum>8</manvolnum></citerefentry> pkthdr with this many zeros e.g. try -z 8 for <citerefentry><refentrytitle>tcpdump</refentrytitle><manvolnum>8</manvolnum></citerefentry> on Red Hat Linux 6.2.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-c <replaceable>hostname_or_IP</replaceable></option></term>
+    <listitem><simpara>Netflow output: send to collector host.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-d <replaceable>port</replaceable></option></term>
+    <listitem><simpara>Netflow output: send to collector UDP port.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-e</option></term>
+    <listitem><simpara>Netflow output: collector peer_as (default = origin_as).</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-s</option></term>
+    <listitem><simpara>Netflow output: disable scaling of output by sampling rate.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-S</option></term>
+    <listitem><simpara>Netflow output: spoof source of packets to input agent IP.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>+v <replaceable>vlans</replaceable></option></term>
+    <listitem><simpara>Include vlans (e.g. +v 0-20,4091).</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-v <replaceable>vlans</replaceable></option></term>
+    <listitem><simpara>Exclude vlans.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-4</option></term>
+    <listitem><simpara>Listen on IPv4 socket only.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-6</option></term>
+    <listitem><simpara>Listen on IPv6 socket only.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>+4</option></term>
+    <listitem><simpara>Listen on both IPv4 and IPv6 sockets.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option><replaceable>any-other-argument</replaceable></option></term>
+    <listitem><simpara>Show summary of options.</simpara></listitem>
+   </varlistentry>
+  </variablelist>
+ </refsect1>
+ <refsect1 id="bugs">
+  <title>BUGS</title>
+  <simpara>
+   Report any upstream bugs to &dhupstreamco; via the address provided in the AUTHORS file (&dhupstreamname;
+   &dhupstreamemail;).
+  </simpara>
+ </refsect1>
+ <refsect1 id="see_also">
+  <title>SEE ALSO</title>
+  <simplelist type="inline">
+   <member><citerefentry><refentrytitle>mrtg</refentrytitle><manvolnum>1</manvolnum></citerefentry></member>
+   <member><citerefentry><refentrytitle>ntop</refentrytitle><manvolnum>8</manvolnum></citerefentry></member>
+   <member><citerefentry><refentrytitle>rrdtool</refentrytitle><manvolnum>1</manvolnum></citerefentry></member>
+   <member><citerefentry><refentrytitle>snort</refentrytitle><manvolnum>8</manvolnum></citerefentry></member>
+   <member><citerefentry><refentrytitle>tcpdump</refentrytitle><manvolnum>8</manvolnum></citerefentry></member>
+  </simplelist>
+ </refsect1>
+</refentry>
