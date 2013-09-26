@@ -1,0 +1,12 @@
+sflowtool (3.28-1) unstable; urgency=low
+
+  * Imported Upstream version 3.28 (Closes: #724738)
+  * Add gitignore file
+  * Add initial Debian packaging
+  * Add 0000-move-configure.in-to-configure.ac
+  * Add 0001-import-inttypes.patch
+  * Add 0002-authors-spelling-fix.patch
+  * Add 0003-correct-number-of-printf-args.patch
+  * Add 0004-examples-interpreter-locations.patch
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Thu, 26 Sep 2013 12:55:52 +0300
