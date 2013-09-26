@@ -1,0 +1,6 @@
+/debian/*.debhelper.log
+/debian/*.debhelper
+/debian/*.substvars
+/debian/files
+/debian/sflowtool/
+/.pc/
