@@ -1,0 +1,125 @@
+Description: Move configure.in to configure.ac
+ Autoconf has long deprecated configure.in, but version 2.0 will make it
+ incompatible. This patch anticipates that, as per
+ https://lists.gnu.org/archive/html/automake/2013-05/msg00049.html
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2013-09-26
+--- a/INSTALL
++++ b/INSTALL
+@@ -19,8 +19,8 @@
+ be considered for the next release.  If at some point `config.cache'
+ contains results you don't want to keep, you may remove or edit it.
+ 
+-   The file `configure.in' is used to create `configure' by a program
+-called `autoconf'.  You only need `configure.in' if you want to change
++   The file `configure.ac' is used to create `configure' by a program
++called `autoconf'.  You only need `configure.ac' if you want to change
+ it or regenerate `configure' using a newer version of `autoconf'.
+ 
+ The simplest way to compile this package is:
+--- a/config.h.in
++++ b/config.h.in
+@@ -1,4 +1,4 @@
+-/* config.h.in.  Generated from configure.in by autoheader.  */
++/* config.h.in.  Generated from configure.ac by autoheader.  */
+ 
+ /* Define to 1 if you don't have `vprintf' but do have `_doprnt.' */
+ #undef HAVE_DOPRNT
+--- /dev/null
++++ b/configure.ac
+@@ -0,0 +1,40 @@
++#                                               -*- Autoconf -*-
++# Process this file with autoconf to produce a configure script.
++
++AC_PREREQ(2.57)
++AC_INIT(src/sflowtool.c)
++PACKAGE=sflowtool
++VERSION=3.28
++AM_INIT_AUTOMAKE($PACKAGE,$VERSION)
++AM_CONFIG_HEADER(config.h)
++AC_CONFIG_SRCDIR([src/sflow.h])
++
++# Checks for programs.
++AC_PROG_CC
++
++# Checks for libraries.
++
++AC_CANONICAL_HOST
++case "$host" in
++*-*-solaris*)
++	LDFLAGS="$LDFLAGS -lsocket -lnsl" 
++	;;
++esac
++
++# Checks for header files.
++AC_HEADER_STDC
++AC_CHECK_HEADERS([fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
++
++# Checks for typedefs, structures, and compiler characteristics.
++AC_C_CONST
++AC_HEADER_TIME
++
++# Checks for library functions.
++AC_FUNC_SELECT_ARGTYPES
++AC_FUNC_STRFTIME
++AC_FUNC_VPRINTF
++AC_CHECK_FUNCS([gethostbyname memset select socket strdup strerror strspn strtol])
++
++AC_CONFIG_FILES([Makefile
++                 src/Makefile])
++AC_OUTPUT
+--- a/configure.in
++++ /dev/null
+@@ -1,40 +0,0 @@
+-#                                               -*- Autoconf -*-
+-# Process this file with autoconf to produce a configure script.
+-
+-AC_PREREQ(2.57)
+-AC_INIT(src/sflowtool.c)
+-PACKAGE=sflowtool
+-VERSION=3.28
+-AM_INIT_AUTOMAKE($PACKAGE,$VERSION)
+-AM_CONFIG_HEADER(config.h)
+-AC_CONFIG_SRCDIR([src/sflow.h])
+-
+-# Checks for programs.
+-AC_PROG_CC
+-
+-# Checks for libraries.
+-
+-AC_CANONICAL_HOST
+-case "$host" in
+-*-*-solaris*)
+-	LDFLAGS="$LDFLAGS -lsocket -lnsl" 
+-	;;
+-esac
+-
+-# Checks for header files.
+-AC_HEADER_STDC
+-AC_CHECK_HEADERS([fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
+-
+-# Checks for typedefs, structures, and compiler characteristics.
+-AC_C_CONST
+-AC_HEADER_TIME
+-
+-# Checks for library functions.
+-AC_FUNC_SELECT_ARGTYPES
+-AC_FUNC_STRFTIME
+-AC_FUNC_VPRINTF
+-AC_CHECK_FUNCS([gethostbyname memset select socket strdup strerror strspn strtol])
+-
+-AC_CONFIG_FILES([Makefile
+-                 src/Makefile])
+-AC_OUTPUT
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -38,7 +38,7 @@
+ subdir = src
+ DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+-am__aclocal_m4_deps = $(top_srcdir)/configure.in
++am__aclocal_m4_deps = $(top_srcdir)/configure.ac
+ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
+ 	$(ACLOCAL_M4)
+ mkinstalldirs = $(install_sh) -d
