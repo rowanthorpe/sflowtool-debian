@@ -2,3 +2,4 @@
 0001-import-inttypes.patch
 0002-authors-spelling-fix.patch
 0003-correct-number-of-printf-args.patch
+0004-examples-interpreter-locations.patch
