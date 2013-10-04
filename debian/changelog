@@ -1,3 +1,14 @@
+sflowtool (3.29-1) unstable; urgency=low
+
+  * Imported Upstream version 3.29
+  * Version dependency bump in control file
+  * Drop import-inttypes.patch, integrated upstream
+  * Drop authors-spelling-fix.patch, integrated upstream
+  * Drop correct-number-of-printf-args.patch, integrated upstream
+  * Refresh move-configure.in-to-configure.ac.patch
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Fri, 04 Oct 2013 08:55:00 +0300
+
 sflowtool (3.28-1) unstable; urgency=low
 
   * Imported Upstream version 3.28 (Closes: #724738)
