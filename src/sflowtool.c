@@ -30,6 +30,7 @@ extern "C" {
 #include <sys/poll.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
+#include <inttypes.h>
 #endif
 
 #include "sflow.h" // sFlow v5
@@ -310,6 +311,7 @@ typedef struct _SFSample {
 #define SASAMPLE_EXTENDED_DATA_MPLS_FTN 1024
 #define SASAMPLE_EXTENDED_DATA_MPLS_LDP_FEC 2048
 #define SASAMPLE_EXTENDED_DATA_VLAN_TUNNEL 4096
+#define SASAMPLE_EXTENDED_DATA_NAT_PORT 8192
 
   /* IP forwarding info */
   SFLAddress nextHop;
@@ -516,7 +518,7 @@ static char *printAddress(SFLAddress *address, char *buf, int bufLen) {
     u_char *b = address->address.ip_v6.addr;
     // should really be: snprintf(buf, buflen,...) but snprintf() is not always available
     sprintf(buf, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
-	    b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],b[9],b[10],b[11],b[12],b[13],b[14],b[15],b[16]);
+	    b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],b[9],b[10],b[11],b[12],b[13],b[14],b[15]);
   }
   return buf;
 }
@@ -1826,6 +1828,18 @@ static void readExtendedNat(SFSample *sample)
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_NAT;
 }
 
+/*_________________---------------------------__________________
+  _________________    readExtendedNatPort    __________________
+  -----------------___________________________------------------
+*/
+
+static void readExtendedNatPort(SFSample *sample)
+{
+  sf_log("extendedType NAT PORT\n");
+  sf_log_next32(sample, "nat_src_port");
+  sf_log_next32(sample, "nat_dst_port");
+}
+
 
 /*_________________---------------------------__________________
   _________________    readExtendedMplsTunnel __________________
@@ -2684,6 +2698,7 @@ static void readFlowSample(SFSample *sample, int expanded)
       case SFLFLOW_EX_URL:     readExtendedUrl(sample); break;
       case SFLFLOW_EX_MPLS:    readExtendedMpls(sample); break;
       case SFLFLOW_EX_NAT:     readExtendedNat(sample); break;
+      case SFLFLOW_EX_NAT_PORT:     readExtendedNatPort(sample); break;
       case SFLFLOW_EX_MPLS_TUNNEL:  readExtendedMplsTunnel(sample); break;
       case SFLFLOW_EX_MPLS_VC:      readExtendedMplsVC(sample); break;
       case SFLFLOW_EX_MPLS_FTN:     readExtendedMplsFTN(sample); break;

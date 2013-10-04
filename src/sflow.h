@@ -212,6 +212,11 @@ typedef struct _SFLExtended_nat {
   SFLAddress dst;    /* Destination address */
 } SFLExtended_nat;
 
+typedef struct _SFLExtended_nat_port {
+  uint32_t src_port;
+  uint32_t dst_port;
+} SFLExtended_nat_port;
+
   /* additional Extended MPLS stucts */
 
 typedef struct _SFLExtended_mpls_tunnel {
@@ -570,6 +575,7 @@ enum SFLFlow_type_tag {
   SFLFLOW_EX_80211_RX      = 1014,
   SFLFLOW_EX_80211_TX      = 1015,
   SFLFLOW_EX_AGGREGATION   = 1016,
+  SFLFLOW_EX_NAT_PORT      = 1020,      /* Extended NAT port information */
   SFLFLOW_EX_SOCKET4       = 2100,
   SFLFLOW_EX_SOCKET6       = 2101,
   SFLFLOW_EX_PROXYSOCKET4  = 2102,
@@ -600,6 +606,7 @@ typedef union _SFLFlow_type {
   SFLExtended_url url;
   SFLExtended_mpls mpls;
   SFLExtended_nat nat;
+  SFLExtended_nat_port nat_port;
   SFLExtended_mpls_tunnel mpls_tunnel;
   SFLExtended_mpls_vc mpls_vc;
   SFLExtended_mpls_FTN mpls_ftn;

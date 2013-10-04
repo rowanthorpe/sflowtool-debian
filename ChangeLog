@@ -1,3 +1,7 @@
+Oct-2-2013:
+       3.29 - added decode for nat_port structure
+	    - include intypes.h for PRIu64 etc.
+	    - minor bugfixes - thanks to Rowan Thorpe
 Sep-27-2012:
        3.28 - added decodes for proxy structures
 	    - added decode for LAG/MLAG structure
