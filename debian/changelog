@@ -1,3 +1,12 @@
+sflowtool (3.30-1) unstable; urgency=low
+
+  * Imported Upstream version 3.30
+  * Refresh move-configure.in-to-configure.ac.patch
+  * Version dependency bump in control file
+  * Bump debian Standards-Version
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Thu, 07 Nov 2013 21:24:25 +0300
+
 sflowtool (3.29-1) unstable; urgency=low
 
   * Imported Upstream version 3.29
