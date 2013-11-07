@@ -1,3 +1,6 @@
+Oct-18-2013:
+       3.30 - exit if printf() fails. Important for detecting streaming errors. Thanks to Nick Hilliard.
+	    - add tunnel structures (http://sflow.org/sflow_tunnels.txt)
 Oct-2-2013:
        3.29 - added decode for nat_port structure
 	    - include intypes.h for PRIu64 etc.

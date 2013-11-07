@@ -552,6 +552,13 @@ typedef struct {
 
 #define SFLAPP_MAX_ACTOR_LEN 64
 
+typedef struct _SFLExtended_vni {
+    uint32_t vni;            /* virtual network identifier */
+} SFLExtended_vni;
+
+typedef struct _SFLExtended_decap {
+    uint32_t innerHeaderOffset;
+} SFLExtended_decap;
 
 enum SFLFlow_type_tag { 
   /* enterprise = 0, format = ... */
@@ -576,6 +583,16 @@ enum SFLFlow_type_tag {
   SFLFLOW_EX_80211_TX      = 1015,
   SFLFLOW_EX_AGGREGATION   = 1016,
   SFLFLOW_EX_NAT_PORT      = 1020,      /* Extended NAT port information */
+    SFLFLOW_EX_L2_TUNNEL_OUT   = 1021, /* http://sflow.org/sflow_tunnels.txt */
+    SFLFLOW_EX_L2_TUNNEL_IN    = 1022,
+    SFLFLOW_EX_IPV4_TUNNEL_OUT = 1023,
+    SFLFLOW_EX_IPV4_TUNNEL_IN  = 1024,
+    SFLFLOW_EX_IPV6_TUNNEL_OUT = 1025,
+    SFLFLOW_EX_IPV6_TUNNEL_IN  = 1026,
+    SFLFLOW_EX_DECAP_OUT       = 1027,
+    SFLFLOW_EX_DECAP_IN        = 1028,
+    SFLFLOW_EX_VNI_OUT         = 1029,
+    SFLFLOW_EX_VNI_IN          = 1030,
   SFLFLOW_EX_SOCKET4       = 2100,
   SFLFLOW_EX_SOCKET6       = 2101,
   SFLFLOW_EX_PROXYSOCKET4  = 2102,
@@ -618,6 +635,8 @@ typedef union _SFLFlow_type {
   SFLExtended_aggregation aggregation;
   SFLExtended_socket_ipv4 socket4;
   SFLExtended_socket_ipv6 socket6;
+  SFLExtended_vni tunnel_vni;
+  SFLExtended_decap tunnel_decap;
 } SFLFlow_type;
 
 typedef struct _SFLFlow_sample_element {

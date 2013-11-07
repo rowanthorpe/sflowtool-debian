@@ -439,7 +439,9 @@ void sf_log(char *fmt, ...)
   if(sfConfig.outputFormat == SFLFMT_FULL) {
     va_list args;
     va_start(args, fmt);
-    vprintf(fmt, args);
+    if(vprintf(fmt, args) < 0) {
+      exit(-40);
+    }
   }
 }
 
@@ -548,42 +550,50 @@ static void writeFlowLine(SFSample *sample)
 {
   char agentIP[51], srcIP[51], dstIP[51];
   // source
-  printf("FLOW,%s,%d,%d,",
-	 printAddress(&sample->agent_addr, agentIP, 50),
-	 sample->inputPort,
-	 sample->outputPort);
+  if(printf("FLOW,%s,%d,%d,",
+	    printAddress(&sample->agent_addr, agentIP, 50),
+	    sample->inputPort,
+	    sample->outputPort) < 0) {
+    exit(-41);
+  }
   // layer 2
-  printf("%02x%02x%02x%02x%02x%02x,%02x%02x%02x%02x%02x%02x,0x%04x,%d,%d",
-	 sample->eth_src[0],
-	 sample->eth_src[1],
-	 sample->eth_src[2],
-	 sample->eth_src[3],
-	 sample->eth_src[4],
-	 sample->eth_src[5],
-	 sample->eth_dst[0],
-	 sample->eth_dst[1],
-	 sample->eth_dst[2],
-	 sample->eth_dst[3],
-	 sample->eth_dst[4],
-	 sample->eth_dst[5],
-	 sample->eth_type,
-	 sample->in_vlan,
-	 sample->out_vlan);
+  if(printf("%02x%02x%02x%02x%02x%02x,%02x%02x%02x%02x%02x%02x,0x%04x,%d,%d",
+	    sample->eth_src[0],
+	    sample->eth_src[1],
+	    sample->eth_src[2],
+	    sample->eth_src[3],
+	    sample->eth_src[4],
+	    sample->eth_src[5],
+	    sample->eth_dst[0],
+	    sample->eth_dst[1],
+	    sample->eth_dst[2],
+	    sample->eth_dst[3],
+	    sample->eth_dst[4],
+	    sample->eth_dst[5],
+	    sample->eth_type,
+	    sample->in_vlan,
+	    sample->out_vlan) < 0) {
+    exit(-42);
+  }
   // layer 3/4
-  printf(",%s,%s,%d,0x%02x,%d,%d,%d,0x%02x",
-	 printAddress(&sample->ipsrc, srcIP, 50),
-	 printAddress(&sample->ipdst, dstIP, 50),
-	 sample->dcd_ipProtocol,
-	 sample->dcd_ipTos,
-	 sample->dcd_ipTTL,
-	 sample->dcd_sport,
-	 sample->dcd_dport,
-	 sample->dcd_tcpFlags);
+  if(printf(",%s,%s,%d,0x%02x,%d,%d,%d,0x%02x",
+	    printAddress(&sample->ipsrc, srcIP, 50),
+	    printAddress(&sample->ipdst, dstIP, 50),
+	    sample->dcd_ipProtocol,
+	    sample->dcd_ipTos,
+	    sample->dcd_ipTTL,
+	    sample->dcd_sport,
+	    sample->dcd_dport,
+	    sample->dcd_tcpFlags) < 0) {
+    exit(-43);
+  }
   // bytes
-  printf(",%d,%d,%d\n",
-	 sample->sampledPacketSize,
-	 sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4,
-	 sample->meanSkipCount);
+  if(printf(",%d,%d,%d\n",
+	    sample->sampledPacketSize,
+	    sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4,
+	    sample->meanSkipCount) < 0) {
+    exit(-44);
+  }
 }
 
 /*_________________---------------------------__________________
@@ -595,27 +605,31 @@ static void writeCountersLine(SFSample *sample)
 {
   // source
   char agentIP[51];
-  printf("CNTR,%s,", printAddress(&sample->agent_addr, agentIP, 50));
-  printf("%u,%u,%"PRIu64",%u,%u,%"PRIu64",%u,%u,%u,%u,%u,%u,%"PRIu64",%u,%u,%u,%u,%u,%u\n",
-	 sample->ifCounters.ifIndex,
-	 sample->ifCounters.ifType,
-	 sample->ifCounters.ifSpeed,
-	 sample->ifCounters.ifDirection,
-	 sample->ifCounters.ifStatus,
-	 sample->ifCounters.ifInOctets,
-	 sample->ifCounters.ifInUcastPkts,
-	 sample->ifCounters.ifInMulticastPkts,
-	 sample->ifCounters.ifInBroadcastPkts,
-	 sample->ifCounters.ifInDiscards,
-	 sample->ifCounters.ifInErrors,
-	 sample->ifCounters.ifInUnknownProtos,
-	 sample->ifCounters.ifOutOctets,
-	 sample->ifCounters.ifOutUcastPkts,
-	 sample->ifCounters.ifOutMulticastPkts,
-	 sample->ifCounters.ifOutBroadcastPkts,
-	 sample->ifCounters.ifOutDiscards,
-	 sample->ifCounters.ifOutErrors,
-	 sample->ifCounters.ifPromiscuousMode);
+  if(printf("CNTR,%s,", printAddress(&sample->agent_addr, agentIP, 50)) < 0) {
+    exit(-45);
+  }
+  if(printf("%u,%u,%"PRIu64",%u,%u,%"PRIu64",%u,%u,%u,%u,%u,%u,%"PRIu64",%u,%u,%u,%u,%u,%u\n",
+	    sample->ifCounters.ifIndex,
+	    sample->ifCounters.ifType,
+	    sample->ifCounters.ifSpeed,
+	    sample->ifCounters.ifDirection,
+	    sample->ifCounters.ifStatus,
+	    sample->ifCounters.ifInOctets,
+	    sample->ifCounters.ifInUcastPkts,
+	    sample->ifCounters.ifInMulticastPkts,
+	    sample->ifCounters.ifInBroadcastPkts,
+	    sample->ifCounters.ifInDiscards,
+	    sample->ifCounters.ifInErrors,
+	    sample->ifCounters.ifInUnknownProtos,
+	    sample->ifCounters.ifOutOctets,
+	    sample->ifCounters.ifOutUcastPkts,
+	    sample->ifCounters.ifOutMulticastPkts,
+	    sample->ifCounters.ifOutBroadcastPkts,
+	    sample->ifCounters.ifOutDiscards,
+	    sample->ifCounters.ifOutErrors,
+	    sample->ifCounters.ifPromiscuousMode) < 0) {
+    exit(-46);
+  }
 }
 
 /*_________________---------------------------__________________
@@ -628,7 +642,9 @@ static void dumpSample(SFSample *sample)
   u_char hex[6000];
   uint32_t markOffset = (u_char *)sample->datap - sample->rawSample;
   printHex(sample->rawSample, sample->rawSampleLen, hex, 6000, markOffset, 16);
-  printf("dumpSample:\n%s\n", hex);
+  if(printf("dumpSample:\n%s\n", hex) < 0) {
+    exit(-47);
+  }
 }
 
 
@@ -2106,22 +2122,22 @@ static void readFlowSample_header(SFSample *sample)
   -----------------___________________________------------------
 */
 
-static void readFlowSample_ethernet(SFSample *sample)
+static void readFlowSample_ethernet(SFSample *sample, char *prefix)
 {
   u_char *p;
-  sf_log("flowSampleType ETHERNET\n");
+  sf_log("flowSampleType %sETHERNET\n", prefix);
   sample->eth_len = getData32(sample);
   memcpy(sample->eth_src, sample->datap, 6);
   skipBytes(sample, 6);
   memcpy(sample->eth_dst, sample->datap, 6);
   skipBytes(sample, 6);
   sample->eth_type = getData32(sample);
-  sf_log("ethernet_type %u\n", sample->eth_type);
-  sf_log("ethernet_len %u\n", sample->eth_len);
+  sf_log("%sethernet_type %u\n", prefix, sample->eth_type);
+  sf_log("%sethernet_len %u\n", prefix, sample->eth_len);
   p = sample->eth_src;
-  sf_log("ethernet_src %02x%02x%02x%02x%02x%02x\n", p[0], p[1], p[2], p[3], p[4], p[5]);
+  sf_log("%sethernet_src %02x%02x%02x%02x%02x%02x\n", prefix, p[0], p[1], p[2], p[3], p[4], p[5]);
   p = sample->eth_dst;
-  sf_log("ethernet_dst %02x%02x%02x%02x%02x%02x\n", p[0], p[1], p[2], p[3], p[4], p[5]);
+  sf_log("%sethernet_dst %02x%02x%02x%02x%02x%02x\n", prefix, p[0], p[1], p[2], p[3], p[4], p[5]);
 }
 
 
@@ -2130,9 +2146,9 @@ static void readFlowSample_ethernet(SFSample *sample)
   -----------------___________________________------------------
 */
 
-static void readFlowSample_IPv4(SFSample *sample)
+static void readFlowSample_IPv4(SFSample *sample, char *prefix)
 {
-  sf_log("flowSampleType IPV4\n");
+  sf_log("flowSampleType %sIPV4\n", prefix);
   sample->headerLen = sizeof(SFLSampled_ipv4);
   sample->header = (u_char *)sample->datap; /* just point at the header */
   skipBytes(sample, sample->headerLen);
@@ -2141,23 +2157,23 @@ static void readFlowSample_IPv4(SFSample *sample)
     SFLSampled_ipv4 nfKey;
     memcpy(&nfKey, sample->header, sizeof(nfKey));
     sample->sampledPacketSize = ntohl(nfKey.length);
-    sf_log("sampledPacketSize %u\n", sample->sampledPacketSize); 
-    sf_log("IPSize %u\n",  sample->sampledPacketSize);
+    sf_log("%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize); 
+    sf_log("%sIPSize %u\n", prefix,  sample->sampledPacketSize);
     sample->ipsrc.type = SFLADDRESSTYPE_IP_V4;
     sample->ipsrc.address.ip_v4 = nfKey.src_ip;
     sample->ipdst.type = SFLADDRESSTYPE_IP_V4;
     sample->ipdst.address.ip_v4 = nfKey.dst_ip;
     sample->dcd_ipProtocol = ntohl(nfKey.protocol);
     sample->dcd_ipTos = ntohl(nfKey.tos);
-    sf_log("srcIP %s\n", printAddress(&sample->ipsrc, buf, 50));
-    sf_log("dstIP %s\n", printAddress(&sample->ipdst, buf, 50));
-    sf_log("IPProtocol %u\n", sample->dcd_ipProtocol);
-    sf_log("IPTOS %u\n", sample->dcd_ipTos);
+    sf_log("%ssrcIP %s\n", prefix, printAddress(&sample->ipsrc, buf, 50));
+    sf_log("%sdstIP %s\n", prefix, printAddress(&sample->ipdst, buf, 50));
+    sf_log("%sIPProtocol %u\n", prefix, sample->dcd_ipProtocol);
+    sf_log("%sIPTOS %u\n", prefix, sample->dcd_ipTos);
     sample->dcd_sport = ntohl(nfKey.src_port);
     sample->dcd_dport = ntohl(nfKey.dst_port);
     switch(sample->dcd_ipProtocol) {
     case 1: /* ICMP */
-      sf_log("ICMPType %u\n", sample->dcd_dport);
+      sf_log("%sICMPType %u\n", prefix, sample->dcd_dport);
       /* not sure about the dest port being icmp type
 	 - might be that src port is icmp type and dest
 	 port is icmp code.  Still, have seen some
@@ -2166,14 +2182,14 @@ static void readFlowSample_IPv4(SFSample *sample)
 	 assume that the destination port has the type */
       break;
     case 6: /* TCP */
-      sf_log("TCPSrcPort %u\n", sample->dcd_sport);
-      sf_log("TCPDstPort %u\n", sample->dcd_dport);
+      sf_log("%sTCPSrcPort %u\n", prefix, sample->dcd_sport);
+      sf_log("%sTCPDstPort %u\n", prefix, sample->dcd_dport);
       sample->dcd_tcpFlags = ntohl(nfKey.tcp_flags);
-      sf_log("TCPFlags %u\n", sample->dcd_tcpFlags);
+      sf_log("%sTCPFlags %u\n", prefix, sample->dcd_tcpFlags);
       break;
     case 17: /* UDP */
-      sf_log("UDPSrcPort %u\n", sample->dcd_sport);
-      sf_log("UDPDstPort %u\n", sample->dcd_dport);
+      sf_log("%sUDPSrcPort %u\n", prefix, sample->dcd_sport);
+      sf_log("%sUDPDstPort %u\n", prefix, sample->dcd_dport);
       break;
     default: /* some other protcol */
       break;
@@ -2186,9 +2202,9 @@ static void readFlowSample_IPv4(SFSample *sample)
   -----------------___________________________------------------
 */
 
-static void readFlowSample_IPv6(SFSample *sample)
+static void readFlowSample_IPv6(SFSample *sample, char *prefix)
 {
-  sf_log("flowSampleType IPV6\n");
+  sf_log("flowSampleType %sIPV6\n", prefix);
   sample->header = (u_char *)sample->datap; /* just point at the header */
   sample->headerLen = sizeof(SFLSampled_ipv6);
   skipBytes(sample, sample->headerLen);
@@ -2197,22 +2213,22 @@ static void readFlowSample_IPv6(SFSample *sample)
     SFLSampled_ipv6 nfKey6;
     memcpy(&nfKey6, sample->header, sizeof(nfKey6));
     sample->sampledPacketSize = ntohl(nfKey6.length);
-    sf_log("sampledPacketSize %u\n", sample->sampledPacketSize); 
-    sf_log("IPSize %u\n", sample->sampledPacketSize); 
+    sf_log("%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize); 
+    sf_log("%sIPSize %u\n", prefix, sample->sampledPacketSize); 
     sample->ipsrc.type = SFLADDRESSTYPE_IP_V6;
     memcpy(&sample->ipsrc.address.ip_v6, &nfKey6.src_ip, 16);
     sample->ipdst.type = SFLADDRESSTYPE_IP_V6;
     memcpy(&sample->ipdst.address.ip_v6, &nfKey6.dst_ip, 16);
     sample->dcd_ipProtocol = ntohl(nfKey6.protocol);
-    sf_log("srcIP6 %s\n", printAddress(&sample->ipsrc, buf, 50));
-    sf_log("dstIP6 %s\n", printAddress(&sample->ipdst, buf, 50));
-    sf_log("IPProtocol %u\n", sample->dcd_ipProtocol);
-    sf_log("priority %u\n", ntohl(nfKey6.priority));
+    sf_log("%ssrcIP6 %s\n", prefix, printAddress(&sample->ipsrc, buf, 50));
+    sf_log("%sdstIP6 %s\n", prefix, printAddress(&sample->ipdst, buf, 50));
+    sf_log("%sIPProtocol %u\n", prefix, sample->dcd_ipProtocol);
+    sf_log("%spriority %u\n", prefix, ntohl(nfKey6.priority));
     sample->dcd_sport = ntohl(nfKey6.src_port);
     sample->dcd_dport = ntohl(nfKey6.dst_port);
     switch(sample->dcd_ipProtocol) {
     case 1: /* ICMP */
-      sf_log("ICMPType %u\n", sample->dcd_dport);
+      sf_log("%sICMPType %u\n", prefix, sample->dcd_dport);
       /* not sure about the dest port being icmp type
 	 - might be that src port is icmp type and dest
 	 port is icmp code.  Still, have seen some
@@ -2221,14 +2237,14 @@ static void readFlowSample_IPv6(SFSample *sample)
 	 assume that the destination port has the type */
       break;
     case 6: /* TCP */
-      sf_log("TCPSrcPort %u\n", sample->dcd_sport);
-      sf_log("TCPDstPort %u\n", sample->dcd_dport);
+      sf_log("%sTCPSrcPort %u\n", prefix, sample->dcd_sport);
+      sf_log("%sTCPDstPort %u\n", prefix, sample->dcd_dport);
       sample->dcd_tcpFlags = ntohl(nfKey6.tcp_flags);
-      sf_log("TCPFlags %u\n", sample->dcd_tcpFlags);
+      sf_log("%sTCPFlags %u\n", prefix, sample->dcd_tcpFlags);
       break;
     case 17: /* UDP */
-      sf_log("UDPSrcPort %u\n", sample->dcd_sport);
-      sf_log("UDPDstPort %u\n", sample->dcd_dport);
+      sf_log("%sUDPSrcPort %u\n", prefix, sample->dcd_sport);
+      sf_log("%sUDPDstPort %u\n", prefix, sample->dcd_dport);
       break;
     default: /* some other protcol */
       break;
@@ -2507,6 +2523,30 @@ static void readExtendedProxySocket6(SFSample *sample)
   sf_log_next32(sample, "proxy_socket6_remote_port");
 }
 
+/*_________________----------------------------__________________
+  _________________    readExtendedDecap       __________________
+  -----------------____________________________------------------
+*/
+
+static void readExtendedDecap(SFSample *sample, char *prefix)
+{
+  uint32_t offset = getData32(sample);
+  sf_log("extendedType %sdecap\n", prefix);
+  sf_log("%sdecap_inner_header_offset %u\n", prefix, offset);
+}
+
+/*_________________----------------------------__________________
+  _________________    readExtendedVNI         __________________
+  -----------------____________________________------------------
+*/
+
+static void readExtendedVNI(SFSample *sample, char *prefix)
+{
+  uint32_t vni = getData32(sample);
+  sf_log("extendedType %sVNI\n", prefix);
+  sf_log("%sVNI %u\n", prefix, vni);
+}
+
 /*_________________---------------------------__________________
   _________________    readFlowSample_v2v4    __________________
   -----------------___________________________------------------
@@ -2548,11 +2588,11 @@ static void readFlowSample_v2v4(SFSample *sample)
   case INMPACKETTYPE_HEADER: readFlowSample_header(sample); break;
   case INMPACKETTYPE_IPV4:
     sample->gotIPV4Struct = YES;
-    readFlowSample_IPv4(sample);
+    readFlowSample_IPv4(sample, "");
     break;
   case INMPACKETTYPE_IPV6:
     sample->gotIPV6Struct = YES;
-    readFlowSample_IPv6(sample);
+    readFlowSample_IPv6(sample, "");
     break;
   default: receiveError(sample, "unexpected packet_data_tag", YES); break;
   }
@@ -2681,9 +2721,9 @@ static void readFlowSample(SFSample *sample, int expanded)
 
       switch(tag) {
       case SFLFLOW_HEADER:     readFlowSample_header(sample); break;
-      case SFLFLOW_ETHERNET:   readFlowSample_ethernet(sample); break;
-      case SFLFLOW_IPV4:       readFlowSample_IPv4(sample); break;
-      case SFLFLOW_IPV6:       readFlowSample_IPv6(sample); break;
+      case SFLFLOW_ETHERNET:   readFlowSample_ethernet(sample, ""); break;
+      case SFLFLOW_IPV4:       readFlowSample_IPv4(sample, ""); break;
+      case SFLFLOW_IPV6:       readFlowSample_IPv6(sample, ""); break;
       case SFLFLOW_MEMCACHE:   readFlowSample_memcache(sample); break;
       case SFLFLOW_HTTP:       readFlowSample_http(sample, tag); break;
       case SFLFLOW_HTTP2:      readFlowSample_http(sample, tag); break;
@@ -2712,6 +2752,16 @@ static void readFlowSample(SFSample *sample, int expanded)
       case SFLFLOW_EX_SOCKET6: readExtendedSocket6(sample); break;
       case SFLFLOW_EX_PROXYSOCKET4: readExtendedProxySocket4(sample); break;
       case SFLFLOW_EX_PROXYSOCKET6: readExtendedProxySocket6(sample); break;
+      case SFLFLOW_EX_L2_TUNNEL_OUT: readFlowSample_ethernet(sample, "tunnel_l2_out_"); break;
+      case SFLFLOW_EX_L2_TUNNEL_IN: readFlowSample_ethernet(sample, "tunnel_l2_in_"); break;
+      case SFLFLOW_EX_IPV4_TUNNEL_OUT: readFlowSample_IPv4(sample, "tunnel_ipv4_out_"); break;
+      case SFLFLOW_EX_IPV4_TUNNEL_IN: readFlowSample_IPv4(sample, "tunnel_ipv4_in_"); break;
+      case SFLFLOW_EX_IPV6_TUNNEL_OUT: readFlowSample_IPv6(sample, "tunnel_ipv6_out_"); break;
+      case SFLFLOW_EX_IPV6_TUNNEL_IN: readFlowSample_IPv6(sample, "tunnel_ipv6_in_"); break;
+      case SFLFLOW_EX_DECAP_OUT: readExtendedDecap(sample, "out_"); break;
+      case SFLFLOW_EX_DECAP_IN: readExtendedDecap(sample, "in_"); break;
+      case SFLFLOW_EX_VNI_OUT: readExtendedVNI(sample, "out_"); break;
+      case SFLFLOW_EX_VNI_IN: readExtendedVNI(sample, "in_"); break;
       default: skipTLVRecord(sample, tag, length, "flow_sample_element"); break;
       }
       lengthCheck(sample, "flow_sample_element", start, length);
@@ -2735,7 +2785,9 @@ static void readFlowSample(SFSample *sample, int expanded)
       break;
     case SFLFMT_CLF:
       if(sfCLF.valid) {
-	printf("%s %s\n", sfCLF.client, sfCLF.http_log);
+	if(printf("%s %s\n", sfCLF.client, sfCLF.http_log) < 0) {
+	  exit(-48);
+	}
       }
       break;
     case SFLFMT_FULL:
