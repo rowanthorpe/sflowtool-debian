@@ -15,7 +15,7 @@ Copyright: 2000-2013 InMon Corp <info@inmon.com>
 License: inmon-sflow-license
 
 Files: debian/*
-Copyright: 2013 Rowan Thorpe <rowan@rowanthorpe.com>
+Copyright: 2013,2014 Rowan Thorpe <rowan@rowanthorpe.com>
 License: GPL-2+
 
 License: inmon-sflow-license
