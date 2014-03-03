@@ -1,0 +1,836 @@
+Description: General types, syntax cleanup and adding explicit coercions
+ This patch cleans up all remaining syntax and type warnings so that on
+ GCC v4.8.2 or later "-Wall -Wextra -pedantic-errors -ansi" CFLAGS yield no
+ warnings (except for ansi-comments which is dealt with in a separate patch for
+ clarity). Some of these may be considered non-essential but this patch is
+ included as-is until upstream indicates which they wish to keep (or all?) in
+ future versions. Interesting to note is that although strict ansi-compliance
+ is more than many care for, while doing exactly that a memory leak and several
+ functional faults were consequently discovered, validating the effort...
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2014-03-03
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -11,6 +11,7 @@
+ #include "config.h"
+ #endif
+ 
++#include <stdint.h>
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <stdlib.h>
+@@ -124,7 +125,7 @@
+ struct mySendPacket {
+   struct myiphdr ip;
+   struct myudphdr udp;
+-  u_char data[SPOOFSOURCE_SENDPACKET_SIZE];
++  uint8_t data[SPOOFSOURCE_SENDPACKET_SIZE];
+ };
+ #endif
+ 
+@@ -180,7 +181,7 @@
+   char *writePcapFile;
+   EnumSFLFormat outputFormat;
+   uint32_t tcpdumpHdrPad;
+-  u_char zeroPad[100];
++  uint8_t zeroPad[100];
+   int pcapSwap;
+ 
+ #ifdef SPOOFSOURCE
+@@ -195,7 +196,7 @@
+   /* vlan filtering */
+   int gotVlanFilter;
+ #define FILTER_MAX_VLAN 4096
+-  u_char vlanFilter[FILTER_MAX_VLAN + 1];
++  uint8_t vlanFilter[FILTER_MAX_VLAN + 1];
+ 
+   /* content stripping */
+   int removeContent;
+@@ -226,9 +227,9 @@
+   uint32_t agentSubId;
+ 
+   /* the raw pdu */
+-  u_char *rawSample;
++  uint8_t *rawSample;
+   uint32_t rawSampleLen;
+-  u_char *endp;
++  uint8_t *endp;
+   time_t pcapTimestamp;
+ 
+   /* decode cursor */
+@@ -254,8 +255,8 @@
+   /* the sampled header */
+   uint32_t packet_data_tag;
+   uint32_t headerProtocol;
+-  u_char *header;
+-  int headerLen;
++  uint8_t *header;
++  unsigned int headerLen;
+   uint32_t stripped;
+ 
+   /* header decode */
+@@ -286,8 +287,8 @@
+   /* ethernet */
+   uint32_t eth_type;
+   uint32_t eth_len;
+-  u_char eth_src[8];
+-  u_char eth_dst[8];
++  uint8_t eth_src[8];
++  uint8_t eth_dst[8];
+ 
+   /* vlan */
+   uint32_t in_vlan;
+@@ -451,13 +452,13 @@
+   -----------------___________________________------------------
+ */
+ 
+-static u_char bin2hex(int nib) { return (nib < 10) ? ('0' + nib) : ('A' - 10 + nib); }
++static uint8_t bin2hex(int nib) { return (nib < 10) ? ('0' + nib) : ('A' - 10 + nib); }
+ 
+-int printHex(const u_char *a, int len, u_char *buf, int bufLen, int marker, int bytesPerOutputLine)
++int printHex(const uint8_t *a, int len, uint8_t *buf, int bufLen, int marker, int bytesPerOutputLine)
+ {
+   int b = 0, i = 0;
+   for(; i < len; i++) {
+-    u_char byte;
++    uint8_t byte;
+     if(b > (bufLen - 10)) break;
+     if(marker > 0 && i == marker) {
+       buf[b++] = '<';
+@@ -488,7 +489,7 @@
+   register char c, *r = in, *w = out;
+   int maxlen = (strlen(in) * 3) + 1;
+   if(outlen < maxlen) return "URLEncode: not enough space";
+-  while (c = *r++) {
++  while ((c = *r++)) {
+     if(isalnum(c)) *w++ = c;
+     else if(isspace(c)) *w++ = '+';
+     else {
+@@ -509,7 +510,7 @@
+ 
+ char *IP_to_a(uint32_t ipaddr, char *buf)
+ {
+-  u_char *ip = (u_char *)&ipaddr;
++  uint8_t *ip = (uint8_t *)&ipaddr;
+   // should really be: snprintf(buf, buflen,...) but snprintf() is not always available
+   sprintf(buf, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+   return buf;
+@@ -519,7 +520,7 @@
+   if(address->type == SFLADDRESSTYPE_IP_V4)
+     IP_to_a(address->address.ip_v4.addr, buf);
+   else {
+-    u_char *b = address->address.ip_v6.addr;
++    uint8_t *b = address->address.ip_v6.addr;
+     // should really be: snprintf(buf, buflen,...) but snprintf() is not always available
+     sprintf(buf, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+ 	    b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],b[9],b[10],b[11],b[12],b[13],b[14],b[15]);
+@@ -641,8 +642,8 @@
+ 
+ static void dumpSample(SFSample *sample)
+ {
+-  u_char hex[6000];
+-  uint32_t markOffset = (u_char *)sample->datap - sample->rawSample;
++  uint8_t hex[6000];
++  uint32_t markOffset = (uint8_t *)sample->datap - sample->rawSample;
+   printHex(sample->rawSample, sample->rawSampleLen, hex, 6000, markOffset, 16);
+   if(printf("dumpSample:\n%s\n", hex) < 0) {
+     exit(-47);
+@@ -656,10 +657,10 @@
+   char scratch[6000];
+   char *msg = "";
+   char *hex = "";
+-  uint32_t markOffset = (u_char *)sample->datap - sample->rawSample;
++  uint32_t markOffset = (uint8_t *)sample->datap - sample->rawSample;
+   if(errm) msg = errm;
+   if(hexdump) {
+-    printHex(sample->rawSample, sample->rawSampleLen, (u_char *)scratch, 6000, markOffset, 16);
++    printHex(sample->rawSample, sample->rawSampleLen, (uint8_t *)scratch, 6000, markOffset, 16);
+     hex = scratch;
+   }
+   fprintf(ERROUT, "%s (source IP = %s) %s\n",
+@@ -675,8 +676,8 @@
+   -----------------___________________________------------------
+ */
+ 
+-static void lengthCheck(SFSample *sample, char *description, u_char *start, int len) {
+-  uint32_t actualLen = (u_char *)sample->datap - start;
++static void lengthCheck(SFSample *sample, char *description, uint8_t *start, int len) {
++  uint32_t actualLen = (uint8_t *)sample->datap - start;
+   uint32_t adjustedLen = ((len + 3) >> 2) << 2;
+   if(actualLen != adjustedLen) {
+     fprintf(ERROUT, "%s length error (expected %d, found %d)\n", description, len, actualLen);
+@@ -699,9 +700,9 @@
+ 
+ static void decodeLinkLayer(SFSample *sample)
+ {
+-  u_char *start = (u_char *)sample->header;
+-  u_char *end = start + sample->headerLen;
+-  u_char *ptr = start;
++  uint8_t *start = (uint8_t *)sample->header;
++  uint8_t *end = start + sample->headerLen;
++  uint8_t *ptr = start;
+   uint16_t type_len;
+ 
+   /* assume not found */
+@@ -790,7 +791,7 @@
+ 
+   if(type_len == 0x0800) {
+     /* IPV4 */
+-    if((end - ptr) < sizeof(struct myiphdr)) return;
++    if((uint8_t)(end - ptr) < sizeof(struct myiphdr)) return;
+     /* look at first byte of header.... */
+     /*  ___________________________ */
+     /* |   version   |    hdrlen   | */
+@@ -823,32 +824,63 @@
+ 
+ static void decode80211MAC(SFSample *sample)
+ {
+-  u_char *start = (u_char *)sample->header;
+-  u_char *end = start + sample->headerLen;
+-  u_char *ptr = start;
++  uint8_t *start;
++  uint8_t *end;
++  uint8_t *ptr;
++  uint32_t fc;
++  uint32_t protocolVersion;
++  uint32_t control;
++  uint32_t subType;
++  uint32_t toDS;
++  uint32_t fromDS;
++  uint32_t moreFrag;
++  uint32_t retry;
++  uint32_t pwrMgt;
++  uint32_t moreData;
++  uint32_t encrypted;
++  uint32_t order;
++  uint32_t duration_id;
++  uint32_t sequence;
++  uint8_t *macAddr1;
++  uint8_t *macAddr2;
++  uint8_t *macAddr3;
++  uint8_t *rxMAC;
++  uint8_t *txMAC;
++  uint8_t *srcMAC;
++  uint8_t *dstMAC;
++
++  /* Just to silence "set but unused" warnings in a portable way (feel free to comment out after debugging). */
++  (void)start; (void)end; (void)ptr; (void)fc; (void)protocolVersion; (void)control; (void)subType;
++  (void)toDS; (void)fromDS; (void)moreFrag; (void)retry; (void)pwrMgt; (void)moreData;
++  (void)encrypted; (void)order; (void)duration_id; (void)sequence;
++  (void)macAddr1; (void)macAddr2; (void)macAddr3; (void)rxMAC; (void)txMAC; (void)srcMAC; (void)dstMAC;
+ 
+   /* assume not found */
+   sample->gotIPV4 = NO;
+   sample->gotIPV6 = NO;
+ 
+-  if(sample->headerLen < WIFI_MIN_HDR_SIZ) return; /* not enough for an 80211 MAC header */
++  if(sample->headerLen >= WIFI_MIN_HDR_SIZ) { /* enough for an 80211 MAC header */
+ 
+-  uint32_t fc = (ptr[1] << 8) + ptr[0];  // [b7..b0][b15..b8]
+-  uint32_t protocolVersion = fc & 3;
+-  uint32_t control = (fc >> 2) & 3;
+-  uint32_t subType = (fc >> 4) & 15;
+-  uint32_t toDS = (fc >> 8) & 1;
+-  uint32_t fromDS = (fc >> 9) & 1;
+-  uint32_t moreFrag = (fc >> 10) & 1;
+-  uint32_t retry = (fc >> 11) & 1;
+-  uint32_t pwrMgt = (fc >> 12) & 1;
+-  uint32_t moreData = (fc >> 13) & 1;
+-  uint32_t encrypted = (fc >> 14) & 1;
+-  uint32_t order = fc >> 15;
++  start = (uint8_t *)sample->header;
++  end = start + sample->headerLen;
++  ptr = start;
++
++  fc = (ptr[1] << 8) + ptr[0];  // [b7..b0][b15..b8]
++  protocolVersion = fc & 3;
++  control = (fc >> 2) & 3;
++  subType = (fc >> 4) & 15;
++  toDS = (fc >> 8) & 1;
++  fromDS = (fc >> 9) & 1;
++  moreFrag = (fc >> 10) & 1;
++  retry = (fc >> 11) & 1;
++  pwrMgt = (fc >> 12) & 1;
++  moreData = (fc >> 13) & 1;
++  encrypted = (fc >> 14) & 1;
++  order = fc >> 15;
+ 
+   ptr += 2;
+ 
+-  uint32_t duration_id = (ptr[1] << 8) + ptr[0]; // not in network byte order either?
++  duration_id = (ptr[1] << 8) + ptr[0]; // not in network byte order either?
+   ptr += 2;
+ 
+   switch(control) {
+@@ -860,13 +892,13 @@
+   case 2: // data
+     {
+       
+-      u_char *macAddr1 = ptr;
++      macAddr1 = ptr;
+       ptr += 6;
+-      u_char *macAddr2 = ptr;
++      macAddr2 = ptr;
+       ptr += 6;
+-      u_char *macAddr3 = ptr;
++      macAddr3 = ptr;
+       ptr += 6;
+-      uint32_t sequence = (ptr[0] << 8) + ptr[1];
++      sequence = (ptr[0] << 8) + ptr[1];
+       ptr += 2;
+ 
+       // ToDS   FromDS   Addr1   Addr2  Addr3   Addr4
+@@ -875,10 +907,10 @@
+       // 1      0        BSSID   SA     DA      N/A
+       // 1      1        RA      TA     DA      SA  (wireless bridge)
+ 
+-      u_char *rxMAC = macAddr1;
+-      u_char *txMAC = macAddr2;
+-      u_char *srcMAC = NULL;
+-      u_char *dstMAC = NULL;
++      rxMAC = macAddr1;
++      txMAC = macAddr2;
++      srcMAC = NULL;
++      dstMAC = NULL;
+ 
+       if(toDS) {
+ 	dstMAC = macAddr3;
+@@ -906,6 +938,7 @@
+       if(rxMAC) sf_log("rxMAC %02x%02x%02x%02x%02x%02x\n", rxMAC[0], rxMAC[1], rxMAC[2], rxMAC[3], rxMAC[4], rxMAC[5]);
+     }
+   }
++  }
+ }
+ 
+ /*_________________---------------------------__________________
+@@ -913,8 +946,8 @@
+   -----------------___________________________------------------
+ */
+ 
+-static void decodeIPLayer4(SFSample *sample, u_char *ptr) {
+-  u_char *end = sample->header + sample->headerLen;
++static void decodeIPLayer4(SFSample *sample, uint8_t *ptr) {
++  uint8_t *end = sample->header + sample->headerLen;
+   if(ptr > (end - 8)) {
+     // not enough header bytes left
+     return;
+@@ -975,7 +1008,7 @@
+ {
+   if(sample->gotIPV4) {
+     char buf[51];
+-    u_char *ptr = sample->header + sample->offsetToIPV4;
++    uint8_t *ptr = sample->header + sample->offsetToIPV4;
+     /* Create a local copy of the IP header (cannot overlay structure in case it is not quad-aligned...some
+        platforms would core-dump if we tried that).  It's OK coz this probably performs just as well anyway. */
+     struct myiphdr ip;
+@@ -1019,10 +1052,10 @@
+   uint16_t payloadLen;
+   uint32_t label;
+   uint32_t nextHeader;
+-  u_char *end = sample->header + sample->headerLen;
++  uint8_t *end = sample->header + sample->headerLen;
+ 
+   if(sample->gotIPV6) {
+-    u_char *ptr = sample->header + sample->offsetToIPV6;
++    uint8_t *ptr = sample->header + sample->offsetToIPV6;
+     
+     // check the version
+     {
+@@ -1216,7 +1249,7 @@
+     nleft -= 2;
+   }
+ 
+-  if (nleft == 1) sum += *(u_char *)w;
++  if (nleft == 1) sum += *(uint8_t *)w;
+ 
+   sum = (sum >> 16) + (sum & 0xffff);
+   sum += (sum >> 16);
+@@ -1294,8 +1327,8 @@
+     struct udpmagichdr {
+       uint32_t src;
+       uint32_t dst;
+-      u_char zero;
+-      u_char proto;
++      uint8_t zero;
++      uint8_t proto;
+       u_short len;
+     } h, saved;
+     
+@@ -1349,7 +1382,7 @@
+ {
+ 
+ #ifdef SPOOFSOURCE
+-  if(sfConfig.spoofSource) return openNetFlowSocket_spoof();
++  if(sfConfig.spoofSource) { openNetFlowSocket_spoof(); return; }
+ #endif
+ 
+   {
+@@ -1461,7 +1494,7 @@
+   uint32_t ans = *(sample->datap)++;
+   // make sure we didn't run off the end of the datagram.  Thanks to 
+   // Sven Eschenberg for spotting a bug/overrun-vulnerabilty that was here before.
+-  if((u_char *)sample->datap > sample->endp) {
++  if((uint8_t *)sample->datap > sample->endp) {
+     SFABORT(sample, SF_ABORT_EOS);
+   }
+   return ans;
+@@ -1488,7 +1521,7 @@
+ static void skipBytes(SFSample *sample, uint32_t skip) {
+   int quads = (skip + 3) / 4;
+   sample->datap += quads;
+-  if(skip > sample->rawSampleLen || (u_char *)sample->datap > sample->endp) {
++  if(skip > sample->rawSampleLen || (uint8_t *)sample->datap > sample->endp) {
+     SFABORT(sample, SF_ABORT_EOS);
+   }
+ }
+@@ -1523,7 +1556,7 @@
+ 
+ void sf_log_nextMAC(SFSample *sample, char *fieldName)
+ {
+-  u_char *mac = (u_char *)sample->datap;
++  uint8_t *mac = (uint8_t *)sample->datap;
+   sf_log("%s %02x%02x%02x%02x%02x%02x\n", fieldName, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+   skipBytes(sample, 6);
+ }
+@@ -1978,13 +2011,13 @@
+ static void readExtendedWifiRx(SFSample *sample)
+ {
+   uint32_t i;
+-  u_char *bssid;
++  uint8_t *bssid;
+   char ssid[SFL_MAX_SSID_LEN+1];
+   if(getString(sample, ssid, SFL_MAX_SSID_LEN) > 0) {
+     sf_log("rx_SSID %s\n", ssid);
+   }
+ 
+-  bssid = (u_char *)sample->datap;
++  bssid = (uint8_t *)sample->datap;
+   sf_log("rx_BSSID ");
+   for(i = 0; i < 6; i++) sf_log("%02x", bssid[i]);
+   sf_log("\n");
+@@ -2006,13 +2039,13 @@
+ static void readExtendedWifiTx(SFSample *sample)
+ {
+   uint32_t i;
+-  u_char *bssid;
++  uint8_t *bssid;
+   char ssid[SFL_MAX_SSID_LEN+1];
+   if(getString(sample, ssid, SFL_MAX_SSID_LEN) > 0) {
+     sf_log("tx_SSID %s\n", ssid);
+   }
+ 
+-  bssid = (u_char *)sample->datap;
++  bssid = (uint8_t *)sample->datap;
+   sf_log("tx_BSSID ");
+   for(i = 0; i < 6; i++) sf_log("%02x", bssid[i]);
+   sf_log("\n");
+@@ -2062,11 +2095,11 @@
+   sample->headerLen = getData32(sample);
+   sf_log("headerLen %u\n", sample->headerLen);
+   
+-  sample->header = (u_char *)sample->datap; /* just point at the header */
++  sample->header = (uint8_t *)sample->datap; /* just point at the header */
+   skipBytes(sample, sample->headerLen);
+   {
+     char scratch[2000];
+-    printHex(sample->header, sample->headerLen, (u_char *)scratch, 2000, 0, 2000);
++    printHex(sample->header, sample->headerLen, (uint8_t *)scratch, 2000, 0, 2000);
+     sf_log("headerBytes %s\n", scratch);
+   }
+   
+@@ -2126,7 +2159,7 @@
+ 
+ static void readFlowSample_ethernet(SFSample *sample, char *prefix)
+ {
+-  u_char *p;
++  uint8_t *p;
+   sf_log("flowSampleType %sETHERNET\n", prefix);
+   sample->eth_len = getData32(sample);
+   memcpy(sample->eth_src, sample->datap, 6);
+@@ -2152,7 +2185,7 @@
+ {
+   sf_log("flowSampleType %sIPV4\n", prefix);
+   sample->headerLen = sizeof(SFLSampled_ipv4);
+-  sample->header = (u_char *)sample->datap; /* just point at the header */
++  sample->header = (uint8_t *)sample->datap; /* just point at the header */
+   skipBytes(sample, sample->headerLen);
+   {
+     char buf[51];
+@@ -2207,7 +2240,7 @@
+ static void readFlowSample_IPv6(SFSample *sample, char *prefix)
+ {
+   sf_log("flowSampleType %sIPV6\n", prefix);
+-  sample->header = (u_char *)sample->datap; /* just point at the header */
++  sample->header = (uint8_t *)sample->datap; /* just point at the header */
+   sample->headerLen = sizeof(SFLSampled_ipv6);
+   skipBytes(sample, sample->headerLen);
+   {
+@@ -2296,6 +2329,9 @@
+   uint64_t req_bytes;
+   uint64_t resp_bytes;
+ 
++  /* Just to silence "set but unused" warnings in a portable way (feel free to comment out after debugging). */
++  (void)req_bytes;
++
+   sf_log("flowSampleType http\n");
+   method = sf_log_next32(sample, "http_method");
+   protocol = sf_log_next32(sample, "http_protocol");
+@@ -2652,11 +2688,11 @@
+ static void readFlowSample(SFSample *sample, int expanded)
+ {
+   uint32_t num_elements, sampleLength;
+-  u_char *sampleStart;
++  uint8_t *sampleStart;
+ 
+   sf_log("sampleType FLOWSAMPLE\n");
+   sampleLength = getData32(sample);
+-  sampleStart = (u_char *)sample->datap;
++  sampleStart = (uint8_t *)sample->datap;
+   sample->samplesGenerated = getData32(sample);
+   sf_log("sampleSequenceNo %u\n", sample->samplesGenerated);
+   if(expanded) {
+@@ -2715,12 +2751,12 @@
+     uint32_t el;
+     for(el = 0; el < num_elements; el++) {
+       uint32_t tag, length;
+-      u_char *start;
++      uint8_t *start;
+       char buf[51];
+       tag = getData32(sample);
+       sf_log("flowBlock_tag %s\n", printTag(tag, buf));
+       length = getData32(sample);
+-      start = (u_char *)sample->datap;
++      start = (uint8_t *)sample->datap;
+ 
+       switch(tag) {
+       case SFLFLOW_HEADER:     readFlowSample_header(sample); break;
+@@ -2986,13 +3022,13 @@
+ static void readCounters_host_hid(SFSample *sample)
+ {
+   uint32_t i;
+-  u_char *uuid;
++  uint8_t *uuid;
+   char hostname[SFL_MAX_HOSTNAME_LEN+1];
+   char os_release[SFL_MAX_OSRELEASE_LEN+1];
+   if(getString(sample, hostname, SFL_MAX_HOSTNAME_LEN) > 0) {
+     sf_log("hostname %s\n", hostname);
+   }
+-  uuid = (u_char *)sample->datap;
++  uuid = (uint8_t *)sample->datap;
+   sf_log("UUID ");
+   for(i = 0; i < 16; i++) sf_log("%02x", uuid[i]);
+   sf_log("\n");
+@@ -3011,7 +3047,7 @@
+ 
+ static void readCounters_adaptors(SFSample *sample)
+ {
+-  u_char *mac;
++  uint8_t *mac;
+   uint32_t i, j, ifindex, num_macs, num_adaptors = getData32(sample);
+   for(i = 0; i < num_adaptors; i++) {
+     ifindex = getData32(sample);
+@@ -3019,7 +3055,7 @@
+     num_macs = getData32(sample);
+     sf_log("adaptor_%u_MACs %u\n", i, num_macs);
+     for(j = 0; j < num_macs; j++) {
+-      mac = (u_char *)sample->datap;
++      mac = (uint8_t *)sample->datap;
+       sf_log("adaptor_%u_MAC_%u %02x%02x%02x%02x%02x%02x\n",
+ 	     i, j,
+ 	     mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+@@ -3544,10 +3580,10 @@
+ {
+   uint32_t sampleLength;
+   uint32_t num_elements;
+-  u_char *sampleStart;
++  uint8_t *sampleStart;
+   sf_log("sampleType COUNTERSSAMPLE\n");
+   sampleLength = getData32(sample);
+-  sampleStart = (u_char *)sample->datap;
++  sampleStart = (uint8_t *)sample->datap;
+   sample->samplesGenerated = getData32(sample);
+   
+   sf_log("sampleSequenceNo %u\n", sample->samplesGenerated);
+@@ -3567,12 +3603,12 @@
+     uint32_t el;
+     for(el = 0; el < num_elements; el++) {
+       uint32_t tag, length;
+-      u_char *start;
++      uint8_t *start;
+       char buf[51];
+       tag = getData32(sample);
+       sf_log("counterBlock_tag %s\n", printTag(tag, buf));
+       length = getData32(sample);
+-      start = (u_char *)sample->datap;
++      start = (uint8_t *)sample->datap;
+       
+       switch(tag) {
+       case SFLCOUNTERS_GENERIC: readCounters_generic(sample); break;
+@@ -3665,7 +3701,7 @@
+   {
+     uint32_t samp = 0;
+     for(; samp < samplesInPacket; samp++) {
+-      if((u_char *)sample->datap >= sample->endp) {
++      if((uint8_t *)sample->datap >= sample->endp) {
+ 	fprintf(ERROUT, "unexpected end of datagram after sample %d of %d\n", samp, samplesInPacket);
+ 	SFABORT(sample, SF_ABORT_EOS);
+       }
+@@ -3707,7 +3743,7 @@
+     SFForwardingTarget *tgt = sfConfig.forwardingTargets;
+     for( ; tgt != NULL; tgt = tgt->nxt) {
+       int bytesSent;
+-      if((bytesSent = sendto(tgt->sock,
++      if((bytesSent = (uint8_t)sendto(tgt->sock,
+ 			     (const char *)sample->rawSample,
+ 			     sample->rawSampleLen,
+ 			     0,
+@@ -3726,7 +3762,7 @@
+     if((exceptionVal = setjmp(sample->env)) == 0)  {
+       // TRY
+       sample->datap = (uint32_t *)sample->rawSample;
+-      sample->endp = (u_char *)sample->rawSample + sample->rawSampleLen;
++      sample->endp = (uint8_t *)sample->rawSample + sample->rawSampleLen;
+       readSFlowDatagram(sample);
+     }
+     else {
+@@ -3747,6 +3783,9 @@
+ {
+   int soc;
+   struct sockaddr_in myaddr_in;
++#ifndef WIN32
++  int save_fd;
++#endif /* WIN32 */
+ 
+   /* Create socket */
+   memset((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
+@@ -3761,7 +3800,7 @@
+ 
+ #ifndef WIN32
+   /* make socket non-blocking */
+-  int save_fd = fcntl(soc, F_GETFL);
++  save_fd = fcntl(soc, F_GETFL);
+   save_fd |= O_NONBLOCK;
+   fcntl(soc, F_SETFL, save_fd);
+ #endif /* WIN32 */
+@@ -3783,6 +3822,9 @@
+ {
+   int soc;
+   struct sockaddr_in6 myaddr_in6;
++#ifndef WIN32
++  int save_fd;
++#endif /* WIN32 */
+ 
+   /* Create socket */
+   memset((char *)&myaddr_in6, 0, sizeof(struct sockaddr_in6));
+@@ -3797,7 +3839,7 @@
+ 
+ #ifndef WIN32
+   /* make socket non-blocking */
+-  int save_fd = fcntl(soc, F_GETFL);
++  save_fd = fcntl(soc, F_GETFL);
+   save_fd |= O_NONBLOCK;
+   fcntl(soc, F_SETFL, save_fd);
+ #endif /* WIN32 */
+@@ -3816,8 +3858,8 @@
+ */
+ 
+ static int ipv4MappedAddress(SFLIPv6 *ipv6addr, SFLIPv4 *ip4addr) {
+-    static u_char mapped_prefix[] = { 0,0,0,0,0,0,0,0,0,0,0xFF,0xFF };
+-    static u_char compat_prefix[] = { 0,0,0,0,0,0,0,0,0,0,0,0 };
++    static uint8_t mapped_prefix[] = { 0,0,0,0,0,0,0,0,0,0,0xFF,0xFF };
++    static uint8_t compat_prefix[] = { 0,0,0,0,0,0,0,0,0,0,0,0 };
+     if(!memcmp(ipv6addr->addr, mapped_prefix, 12) ||
+        !memcmp(ipv6addr->addr, compat_prefix, 12)) {
+         memcpy(ip4addr, ipv6addr->addr + 12, 4);
+@@ -3834,7 +3876,9 @@
+ static void readPacket(int soc)
+ {
+   struct sockaddr_in6 peer;
+-  int alen, cc;
++  unsigned int alen;
++  int cc;
++  SFSample sample;
+ #define MAX_PKT_SIZ 65536
+   char buf[MAX_PKT_SIZ];
+   alen = sizeof(peer);
+@@ -3844,10 +3888,9 @@
+     fprintf(ERROUT, "recvfrom() failed, %s\n", strerror(errno));
+     return;
+   }
+-  SFSample sample;
+   memset(&sample, 0, sizeof(sample));
+-  sample.rawSample = (u_char *)buf;
+-  sample.rawSampleLen = cc;
++  sample.rawSample = (uint8_t *)buf;
++  sample.rawSampleLen = (uint8_t)cc;
+   if(alen == sizeof(struct sockaddr_in)) {
+     struct sockaddr_in *peer4 = (struct sockaddr_in *)&peer;
+     sample.sourceIP.type = SFLADDRESSTYPE_IP_V4;
+@@ -3880,10 +3923,10 @@
+   or -1 if not found. Decode the 802.1d if it's there.
+ */
+ 
+-static int pcapOffsetToSFlow(u_char *start, int len)
++static int pcapOffsetToSFlow(uint8_t *start, int len)
+ {
+-  u_char *end = start + len;
+-  u_char *ptr = start;
++  uint8_t *end = start + len;
++  uint8_t *ptr = start;
+   uint16_t type_len;
+ 
+   // assume Ethernet header
+@@ -3907,7 +3950,7 @@
+   }
+ 
+   /* now we're just looking for IP */
+-  if(end - ptr < NFT_MIN_SIZ) return -1; /* not enough for an IPv4 header */
++  if((uint8_t)(end - ptr) < NFT_MIN_SIZ) return -1; /* not enough for an IPv4 header */
+   
+   /* peek for IPX */
+   if(type_len == 0x0200 || type_len == 0x0201 || type_len == 0x0600) {
+@@ -3957,7 +4000,7 @@
+ 
+   if(type_len == 0x0800) {
+     /* IPV4 */
+-    if((end - ptr) < sizeof(struct myiphdr)) return -1;
++    if((uint8_t)(end - ptr) < sizeof(struct myiphdr)) return -1;
+     /* look at first byte of header.... */
+     /*  ___________________________ */
+     /* |   version   |    hdrlen   | */
+@@ -3986,7 +4029,7 @@
+ 
+ static int readPcapPacket(FILE *file)
+ {
+-  u_char buf[2048];
++  uint8_t buf[2048];
+   struct pcap_pkthdr hdr;
+   SFSample sample;
+   int skipBytes = 0;
+@@ -4053,7 +4096,7 @@
+   }
+ }
+ 
+-static void parseVlanFilter(u_char *array, u_char flag, char *start)
++static void parseVlanFilter(uint8_t *array, uint8_t flag, char *start)
+ {
+   char *p = start;
+   char *sep = " ,";
+@@ -4202,7 +4245,8 @@
+ 
+ static void process_command_line(int argc, char *argv[])
+ {
+-  int arg = 1, in = 0;
++  char in;
++  int arg = 1;
+   int i;
+   int plus,minus;
+   size_t len_str;
+@@ -4222,7 +4266,7 @@
+     plus = (argv[arg][0] == '+');
+     minus = (argv[arg][0] == '-');
+     if(plus == NO && minus == NO) { instructions(*argv); exit(1); }
+-    in = argv[arg++][1];
++    in = (char)argv[arg++][1];
+     /* check first that options with/without arguments are correct */
+     switch(in) {
+     case 't':
+--- a/src/sflow.h
++++ b/src/sflow.h
+@@ -12,12 +12,13 @@
+ extern "C" {
+ #endif
+ 
++#include <stdint.h>
+ typedef struct {
+     uint32_t addr;
+ } SFLIPv4;
+ 
+ typedef struct {
+-    u_char addr[16];
++    uint8_t addr[16];
+ } SFLIPv6;
+ 
+ typedef union _SFLAddress_value {
+@@ -320,7 +321,7 @@
+   IEEE80211_A=1,
+   IEEE80211_B=2,
+   IEEE80211_G=3,
+-  IEEE80211_N=4,
++  IEEE80211_N=4
+ } SFL_IEEE80211_version;
+ 
+ /* opaque = flow_data; enterprise = 0; format = 1014 */
+@@ -411,7 +412,7 @@
+ typedef enum  {
+   MEMCACHE_PROT_OTHER   = 0,
+   MEMCACHE_PROT_ASCII   = 1,
+-  MEMCACHE_PROT_BINARY  = 2,
++  MEMCACHE_PROT_BINARY  = 2
+ } SFLMemcache_prot;
+ 
+ typedef enum  {
+@@ -431,7 +432,7 @@
+   MEMCACHE_CMD_FLUSH    = 13,
+   MEMCACHE_CMD_VERSION  = 14,
+   MEMCACHE_CMD_QUIT     = 15,
+-  MEMCACHE_CMD_TOUCH    = 16,
++  MEMCACHE_CMD_TOUCH    = 16
+ } SFLMemcache_cmd;
+ 
+ enum SFLMemcache_operation_status {
+@@ -444,7 +445,7 @@
+   MEMCACHE_OP_NOT_STORED   = 6,
+   MEMCACHE_OP_EXISTS       = 7,
+   MEMCACHE_OP_NOT_FOUND    = 8,
+-  MEMCACHE_OP_DELETED      = 9,
++  MEMCACHE_OP_DELETED      = 9
+ };
+ 
+ #define SFL_MAX_MEMCACHE_KEY 255
+@@ -468,7 +469,7 @@
+   SFHTTP_PUT      = 5,
+   SFHTTP_DELETE   = 6,
+   SFHTTP_TRACE    = 7,
+-  SFHTTP_CONNECT  = 8,
++  SFHTTP_CONNECT  = 8
+ } SFLHTTP_method;
+ 
+ #define SFL_MAX_HTTP_URI 255
+@@ -507,7 +508,7 @@
+   SFLAPP_NOT_IMPLEMENTED = 7,
+   SFLAPP_NOT_FOUND       = 8,
+   SFLAPP_UNAVAILABLE     = 9,
+-  SFLAPP_UNAUTHORIZED    = 10,
++  SFLAPP_UNAUTHORIZED    = 10
+ } EnumSFLAPPStatus;
+ 
+   static const char *SFL_APP_STATUS_names[] = { "SUCCESS",
+@@ -603,7 +604,7 @@
+   SFLFLOW_APP_CTXT         = 2203, /* enclosing server context */
+   SFLFLOW_APP_ACTOR_INIT   = 2204, /* initiator */
+   SFLFLOW_APP_ACTOR_TGT    = 2205, /* target */
+-  SFLFLOW_HTTP2            = 2206,
++  SFLFLOW_HTTP2            = 2206
+ };
+ 
+ typedef union _SFLFlow_type {
+@@ -919,7 +920,7 @@
+ 
+ typedef struct _SFLHostId {
+   SFLString hostname;
+-  u_char uuid[16];
++  uint8_t uuid[16];
+   uint32_t machine_type; /* enum SFLMachine_type */
+   uint32_t os_name;      /* enum SFLOS_name */
+   SFLString os_release;  /* max len 32 bytes */
+@@ -1299,7 +1300,7 @@
+   SFLCOUNTERS_MEMCACHE2     = 2204, /* memcached */
+   SFLCOUNTERS_VDI           = 2205,
+   SFLCOUNTERS_APP_WORKERS   = 2206,
+-  SFLCOUNTERS_HOST_GPU_NVML = (5703 << 12) + 1, /* = 23359489 */
++  SFLCOUNTERS_HOST_GPU_NVML = (5703 << 12) + 1 /* = 23359489 */
+ };
+ 
+ typedef union _SFLCounters_type {
