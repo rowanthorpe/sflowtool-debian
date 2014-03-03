@@ -2,9 +2,9 @@
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
 
-<!ENTITY dhdate          "September 26, 2013">
-<!ENTITY dhyears         "<year>2013</year>">
-<!ENTITY dhversion       "3.28">
+<!ENTITY dhdate          "March 3, 2014">
+<!ENTITY dhyears         "<year>2013,2014</year>">
+<!ENTITY dhversion       "3.30">
 <!ENTITY dhemail         "<email>rowan@rowanthorpe.com</email>">
 <!ENTITY dhupstreamemail "<email>neil.mckee@inmon.com</email>">
 <!ENTITY dhfirstname     "<firstname>Rowan</firstname>">
@@ -168,7 +168,11 @@
     <listitem><simpara>Listen on both IPv4 and IPv6 sockets.</simpara></listitem>
    </varlistentry>
    <varlistentry>
-    <term><option><replaceable>any-other-argument</replaceable></option></term>
+    <term><option>-k</option></term>
+    <listitem><simpara>Keep going on non-signal errors rather than aborting.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-h, -?</option></term>
     <listitem><simpara>Show summary of options.</simpara></listitem>
    </varlistentry>
   </variablelist>

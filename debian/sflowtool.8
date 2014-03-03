@@ -2,12 +2,12 @@
 .\"     Title: SFLOWTOOL
 .\"    Author: Rowan Thorpe <rowan@rowanthorpe.com>
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: September 26, 2013
+.\"      Date: March 3, 2014
 .\"    Manual: System administration commands and daemons
-.\"    Source: sflowtool 3.28
+.\"    Source: sflowtool 3.30
 .\"  Language: English
 .\"
-.TH "SFLOWTOOL" "8" "September 26, 2013" "sflowtool 3\&.28" "System administration commands"
+.TH "SFLOWTOOL" "8" "March 3, 2014" "sflowtool 3\&.30" "System administration commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -139,7 +139,12 @@ Listen on IPv6 socket only\&.
 Listen on both IPv4 and IPv6 sockets\&.
 .RE
 .PP
-\fB\fIany\-other\-argument\fR\fR
+\fB\-k\fR
+.RS 4
+Keep going on non\-signal errors rather than aborting\&.
+.RE
+.PP
+\fB\-h, \-?\fR
 .RS 4
 Show summary of options\&.
 .RE
@@ -156,7 +161,7 @@ Wrote this manpage for the Debian(TM) system\&.
 .RE
 .SH "COPYRIGHT"
 .br
-Copyright \(co 2013 Rowan\ \&Thorpe
+Copyright \(co 2013,2014 Rowan\ \&Thorpe
 .br
 .PP
 This manual page was written for the
