@@ -4,3 +4,4 @@
 0006-improve-flag-parsing.patch
 0007-replace-snprintf-and-strdup-remove-unused-lens.patch
 0008-update-deprecated-gethostbyname-format.patch
+0009-add-missing-include.patch

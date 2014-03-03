@@ -1,0 +1,14 @@
+Description: Add include-file to silence "implicit" compiler warning
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2014-03-03
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -20,6 +20,7 @@
+ #include <fcntl.h>
+ #include <time.h>
+ #include <setjmp.h>
++#include <ctype.h>
+ 
+ #ifdef WIN32 
+ #else
