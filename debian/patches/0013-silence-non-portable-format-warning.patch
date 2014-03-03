@@ -1,0 +1,21 @@
+Description: Add GCC pragma to silence non-portable strftime warning
+ A non-portable use of %z in strftime is made, so upstream is being made aware
+ of that (via this patch) and until upstream decide how/if to deal with that,
+ this patch silences GCC warnings about it.
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2014-03-03
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -2371,7 +2371,10 @@
+   if(sfConfig.outputFormat == SFLFMT_CLF) {
+     time_t now = time(NULL);
+     char nowstr[200];
+-    strftime(nowstr, 200, "%d/%b/%Y:%H:%M:%S %z", localtime(&now));
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wformat"
++    strftime(nowstr, 200, "%d/%b/%Y:%H:%M:%S %z", localtime(&now)); /* there seems to be no simple portable equivalent to %z */
++#pragma GCC diagnostic pop
+     /* should really be: snprintf(sfCLF.http_log, SFLFMT_CLF_MAX_LINE,...) but snprintf() is not always available */
+     sprintf(sfCLF.http_log, "- %s [%s] \"%s %s HTTP/%u.%u\" %u %"PRIu64" \"%s\" \"%s\"",
+ 	     authuser[0] ? authuser : "-",
