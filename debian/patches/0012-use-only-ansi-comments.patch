@@ -1,0 +1,805 @@
+Description: Replace non-ansi comments for consistency with others (majority)
+ This completes the separate patch which cleans up syntax, etc so that on
+ GCC v4.8.2 or later "-Wall -Wextra -pedantic-errors -ansi" CFLAGS yield no
+ warnings (except for ansi-comments which is dealt with in a separate patch for
+ clarity). This may be considered non-essential but this patch is included
+ as-is until upstream indicates if they wish to keep it in future versions.
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2014-03-03
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -35,10 +35,10 @@
+ #include <inttypes.h>
+ #endif
+ 
+-#include "sflow.h" // sFlow v5
+-#include "sflowtool.h" // sFlow v2/4
++#include "sflow.h" /* sFlow v5 */
++#include "sflowtool.h" /* sFlow v2/4 */
+ 
+-// If the platform is Linux, enable the source-spoofing feature too.
++/* If the platform is Linux, enable the source-spoofing feature too. */
+ #ifdef linux
+ #define SPOOFSOURCE 1
+ #endif
+@@ -471,7 +471,7 @@
+     buf[b++] = bin2hex(byte & 0x0f);
+     if(i > 0 && (i % bytesPerOutputLine) == 0) buf[b++] = '\n';
+     else {
+-      // separate the bytes with a dash
++      /* separate the bytes with a dash */
+       if (i < (len - 1)) buf[b++] = '-';
+     }
+   }
+@@ -511,7 +511,7 @@
+ char *IP_to_a(uint32_t ipaddr, char *buf)
+ {
+   uint8_t *ip = (uint8_t *)&ipaddr;
+-  // should really be: snprintf(buf, buflen,...) but snprintf() is not always available
++  /* should really be: snprintf(buf, buflen,...) but snprintf() is not always available */
+   sprintf(buf, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+   return buf;
+ }
+@@ -521,7 +521,7 @@
+     IP_to_a(address->address.ip_v4.addr, buf);
+   else {
+     uint8_t *b = address->address.ip_v6.addr;
+-    // should really be: snprintf(buf, buflen,...) but snprintf() is not always available
++    /* should really be: snprintf(buf, buflen,...) but snprintf() is not always available */
+     sprintf(buf, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+ 	    b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],b[9],b[10],b[11],b[12],b[13],b[14],b[15]);
+   }
+@@ -535,10 +535,10 @@
+ 
+ int sampleFilterOK(SFSample *sample)
+ {
+-  // the vlan filter will only reject a sample if both in_vlan and out_vlan are rejected. If the
+-  // vlan was not reported in an SFLExtended_Switch struct, but was only picked up from the 802.1q header
+-  // then the out_vlan will be 0,  so to be sure you are rejecting vlan 1,  you may need to reject both
+-  // vlan 0 and vlan 1.
++  /* the vlan filter will only reject a sample if both in_vlan and out_vlan are rejected. If the
++     vlan was not reported in an SFLExtended_Switch struct, but was only picked up from the 802.1q header
++     then the out_vlan will be 0,  so to be sure you are rejecting vlan 1,  you may need to reject both
++     vlan 0 and vlan 1. */
+   return(sfConfig.gotVlanFilter == NO
+ 	 || sfConfig.vlanFilter[sample->in_vlan]
+ 	 || sfConfig.vlanFilter[sample->out_vlan]);
+@@ -552,14 +552,14 @@
+ static void writeFlowLine(SFSample *sample)
+ {
+   char agentIP[51], srcIP[51], dstIP[51];
+-  // source
++  /* source */
+   if(printf("FLOW,%s,%d,%d,",
+ 	    printAddress(&sample->agent_addr, agentIP),
+ 	    sample->inputPort,
+ 	    sample->outputPort) < 0) {
+     exit(-41);
+   }
+-  // layer 2
++  /* layer 2 */
+   if(printf("%02x%02x%02x%02x%02x%02x,%02x%02x%02x%02x%02x%02x,0x%04x,%d,%d",
+ 	    sample->eth_src[0],
+ 	    sample->eth_src[1],
+@@ -578,7 +578,7 @@
+ 	    sample->out_vlan) < 0) {
+     exit(-42);
+   }
+-  // layer 3/4
++  /* layer 3/4 */
+   if(printf(",%s,%s,%d,0x%02x,%d,%d,%d,0x%02x",
+ 	    printAddress(&sample->ipsrc, srcIP),
+ 	    printAddress(&sample->ipdst, dstIP),
+@@ -590,7 +590,7 @@
+ 	    sample->dcd_tcpFlags) < 0) {
+     exit(-43);
+   }
+-  // bytes
++  /* bytes */
+   if(printf(",%d,%d,%d\n",
+ 	    sample->sampledPacketSize,
+ 	    sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4,
+@@ -606,7 +606,7 @@
+ 
+ static void writeCountersLine(SFSample *sample)
+ {
+-  // source
++  /* source */
+   char agentIP[51];
+   if(printf("CNTR,%s,", printAddress(&sample->agent_addr, agentIP)) < 0) {
+     exit(-45);
+@@ -866,7 +866,7 @@
+   end = start + sample->headerLen;
+   ptr = start;
+ 
+-  fc = (ptr[1] << 8) + ptr[0];  // [b7..b0][b15..b8]
++  fc = (ptr[1] << 8) + ptr[0];  /* [b7..b0][b15..b8] */
+   protocolVersion = fc & 3;
+   control = (fc >> 2) & 3;
+   subType = (fc >> 4) & 15;
+@@ -881,16 +881,16 @@
+ 
+   ptr += 2;
+ 
+-  duration_id = (ptr[1] << 8) + ptr[0]; // not in network byte order either?
++  duration_id = (ptr[1] << 8) + ptr[0]; /* not in network byte order either? */
+   ptr += 2;
+ 
+   switch(control) {
+-  case 0: // mgmt
+-  case 1: // ctrl
+-  case 3: // rsvd
++  case 0: /* mgmt */
++  case 1: /* ctrl */
++  case 3: /* rsvd */
+   break;
+ 
+-  case 2: // data
++  case 2: /* data */
+     {
+       
+       macAddr1 = ptr;
+@@ -902,11 +902,11 @@
+       sequence = (ptr[0] << 8) + ptr[1];
+       ptr += 2;
+ 
+-      // ToDS   FromDS   Addr1   Addr2  Addr3   Addr4
+-      // 0      0        DA      SA     BSSID   N/A (ad-hoc)
+-      // 0      1        DA      BSSID  SA      N/A
+-      // 1      0        BSSID   SA     DA      N/A
+-      // 1      1        RA      TA     DA      SA  (wireless bridge)
++      /* ToDS   FromDS   Addr1   Addr2  Addr3   Addr4
++         0      0        DA      SA     BSSID   N/A (ad-hoc)
++         0      1        DA      BSSID  SA      N/A
++         1      0        BSSID   SA     DA      N/A
++         1      1        RA      TA     DA      SA  (wireless bridge) */
+ 
+       rxMAC = macAddr1;
+       txMAC = macAddr2;
+@@ -916,15 +916,15 @@
+       if(toDS) {
+ 	dstMAC = macAddr3;
+ 	if(fromDS) {
+-	  srcMAC = ptr; // macAddr4.  1,1 => (wireless bridge)
++	  srcMAC = ptr; /* macAddr4.  1,1 => (wireless bridge) */
+ 	  ptr += 6;
+ 	}
+-	else srcMAC = macAddr2;  // 1,0
++	else srcMAC = macAddr2;  /* 1,0 */
+       }
+       else {
+ 	dstMAC = macAddr1;
+-	if(fromDS) srcMAC = macAddr3; // 0,1
+-	else srcMAC = macAddr2; // 0,0
++	if(fromDS) srcMAC = macAddr3; /* 0,1 */
++	else srcMAC = macAddr2; /* 0,0 */
+       }
+ 
+       if(srcMAC) {
+@@ -950,7 +950,7 @@
+ static void decodeIPLayer4(SFSample *sample, uint8_t *ptr) {
+   uint8_t *end = sample->header + sample->headerLen;
+   if(ptr > (end - 8)) {
+-    // not enough header bytes left
++    /* not enough header bytes left */
+     return;
+   }
+   switch(sample->dcd_ipProtocol) {
+@@ -1058,7 +1058,7 @@
+   if(sample->gotIPV6) {
+     uint8_t *ptr = sample->header + sample->offsetToIPV6;
+     
+-    // check the version
++    /* check the version */
+     {
+       int ipVersion = (*ptr >> 4);
+       if(ipVersion != 6) {
+@@ -1067,31 +1067,31 @@
+       }
+     }
+ 
+-    // get the tos (priority)
++    /* get the tos (priority) */
+     sample->dcd_ipTos = *ptr++ & 15;
+     sf_log("IPTOS %u\n", sample->dcd_ipTos);
+-    // 24-bit label
++    /* 24-bit label */
+     label = *ptr++;
+     label <<= 8;
+     label += *ptr++;
+     label <<= 8;
+     label += *ptr++;
+     sf_log("IP6_label 0x%lx\n", label);
+-    // payload
++    /* payload */
+     payloadLen = (ptr[0] << 8) + ptr[1];
+     ptr += 2;
+-    // if payload is zero, that implies a jumbo payload
++    /* if payload is zero, that implies a jumbo payload */
+     if(payloadLen == 0) sf_log("IPV6_payloadLen <jumbo>\n");
+     else sf_log("IPV6_payloadLen %u\n", payloadLen);
+ 
+-    // next header
++    /* next header */
+     nextHeader = *ptr++;
+ 
+-    // TTL
++    /* TTL */
+     sample->dcd_ipTTL = *ptr++;
+     sf_log("IPTTL %u\n", sample->dcd_ipTTL);
+ 
+-    {// src and dst address
++    {/* src and dst address */
+       char buf[101];
+       sample->ipsrc.type = SFLADDRESSTYPE_IP_V6;
+       memcpy(&sample->ipsrc.address, ptr, 16);
+@@ -1103,25 +1103,25 @@
+       sf_log("dstIP6 %s\n", printAddress(&sample->ipdst, buf));
+     }
+ 
+-    // skip over some common header extensions...
+-    // http://searchnetworking.techtarget.com/originalContent/0,289142,sid7_gci870277,00.html
+-    while(nextHeader == 0 ||  // hop
+-	  nextHeader == 43 || // routing
+-	  nextHeader == 44 || // fragment
+-	  // nextHeader == 50 || // encryption - don't bother coz we'll not be able to read any further
+-	  nextHeader == 51 || // auth
+-	  nextHeader == 60) { // destination options
++    /* skip over some common header extensions...
++       http://searchnetworking.techtarget.com/originalContent/0,289142,sid7_gci870277,00.html */
++    while(nextHeader == 0 ||  /* hop */
++	  nextHeader == 43 || /* routing */
++	  nextHeader == 44 || /* fragment */
++	  /* nextHeader == 50 || // encryption - don't bother coz we'll not be able to read any further */
++	  nextHeader == 51 || /* auth */
++	  nextHeader == 60) { /* destination options */
+       uint32_t optionLen, skip;
+       sf_log("IP6HeaderExtension: %d\n", nextHeader);
+       nextHeader = ptr[0];
+-      optionLen = 8 * (ptr[1] + 1);  // second byte gives option len in 8-byte chunks, not counting first 8
++      optionLen = 8 * (ptr[1] + 1);  /* second byte gives option len in 8-byte chunks, not counting first 8 */
+       skip = optionLen - 2;
+       ptr += skip;
+-      if(ptr > end) return; // ran off the end of the header
++      if(ptr > end) return; /* ran off the end of the header */
+     }
+     
+-    // now that we have eliminated the extension headers, nextHeader should have what we want to
+-    // remember as the ip protocol...
++    /* now that we have eliminated the extension headers, nextHeader should have what we want to
++       remember as the ip protocol... */
+     sample->dcd_ipProtocol = nextHeader;
+     sf_log("IPProtocol %u\n", sample->dcd_ipProtocol);
+     decodeIPLayer4(sample, ptr);
+@@ -1210,12 +1210,12 @@
+   hdr.len = sample->sampledPacketSize;
+   hdr.caplen = sample->headerLen;
+   if(sfConfig.removeContent && sample->offsetToPayload) {
+-    // shorten the captured header to ensure no payload bytes are included
++    /* shorten the captured header to ensure no payload bytes are included */
+     hdr.caplen = sample->offsetToPayload;
+   }
+ 
+-  // prepare the whole thing in a buffer first, in case we are piping the output
+-  // to another process and the reader expects it all to appear at once...
++  /* prepare the whole thing in a buffer first, in case we are piping the output
++     to another process and the reader expects it all to appear at once... */
+   memcpy(buf, &hdr, sizeof(hdr));
+   bytes = sizeof(hdr);
+   if(sfConfig.tcpdumpHdrPad > 0) {
+@@ -1285,16 +1285,16 @@
+   memset(&sfConfig.sendPkt, 0, sizeof(sfConfig.sendPkt));
+   sfConfig.sendPkt.ip.version_and_headerLen = 0x45;
+   sfConfig.sendPkt.ip.protocol = IPPROTO_UDP;
+-  sfConfig.sendPkt.ip.ttl = 64; // IPDEFTTL
+-  sfConfig.ipid = 12000; // start counting from 12000 (just an arbitrary number)
+-  // sfConfig.ip->frag_off = htons(0x4000); // don't fragment
+-  // can't set the source address yet, but the dest address is known
++  sfConfig.sendPkt.ip.ttl = 64; /* IPDEFTTL */
++  sfConfig.ipid = 12000; /* start counting from 12000 (just an arbitrary number) */
++  /* sfConfig.ip->frag_off = htons(0x4000); // don't fragment */
++  /* can't set the source address yet, but the dest address is known */
+   sfConfig.sendPkt.ip.daddr = sfConfig.netFlowOutputIP.s_addr;
+-  // can't do the ip_len and checksum until we know the size of the packet
++  /* can't do the ip_len and checksum until we know the size of the packet */
+   sfConfig.sendPkt.udp.uh_dport = htons(sfConfig.netFlowOutputPort);
+-  // might as well set the source port to be the same
++  /* might as well set the source port to be the same */
+   sfConfig.sendPkt.udp.uh_sport = htons(sfConfig.netFlowOutputPort);
+-  // can't do the udp_len or udp_checksum until we know the size of the packet
++  /* can't do the udp_len or udp_checksum until we know the size of the packet */
+ }
+ 
+ 
+@@ -1307,22 +1307,22 @@
+ static void sendNetFlowDatagram_spoof(SFSample *sample, NFFlowPkt5 *pkt)
+ {
+   uint16_t packetLen = sizeof(*pkt) + sizeof(struct myiphdr) + sizeof(struct myudphdr);
+-  // copy the data into the send packet
++  /* copy the data into the send packet */
+   memcpy(sfConfig.sendPkt.data, (char *)pkt, sizeof(*pkt));
+-  // increment the ip-id
++  /* increment the ip-id */
+   sfConfig.sendPkt.ip.id = htons(++sfConfig.ipid);
+-  // set the length fields in the ip and udp headers
++  /* set the length fields in the ip and udp headers */
+   sfConfig.sendPkt.ip.tot_len = htons(packetLen);
+   sfConfig.sendPkt.udp.uh_ulen = htons(packetLen - sizeof(struct myiphdr));
+-  // set the source address to the source address of the input event
++  /* set the source address to the source address of the input event */
+   sfConfig.sendPkt.ip.saddr = sample->agent_addr.address.ip_v4.addr;
+-  // IP header checksum
++  /* IP header checksum */
+   sfConfig.sendPkt.ip.check = in_checksum((uint16_t *)&sfConfig.sendPkt.ip, sizeof(struct myiphdr));
+   if (sfConfig.sendPkt.ip.check == 0) sfConfig.sendPkt.ip.check = 0xffff;
+-  // UDP Checksum
+-  // copy out those parts of the IP header that are supposed to be in the UDP checksum,
+-  // and blat them in front of the udp header (after saving what was there before).
+-  // Then compute the udp checksum.  Then patch the saved data back again.
++  /* UDP Checksum
++     copy out those parts of the IP header that are supposed to be in the UDP checksum,
++     and blat them in front of the udp header (after saving what was there before).
++     Then compute the udp checksum.  Then patch the saved data back again. */
+   {
+     char *ptr;
+     struct udpmagichdr {
+@@ -1338,22 +1338,22 @@
+     h.zero = 0;
+     h.proto = IPPROTO_UDP;
+     h.len = sfConfig.sendPkt.udp.uh_ulen;
+-    // set the pointer to 12 bytes before the start of the udp header
++    /* set the pointer to 12 bytes before the start of the udp header */
+     ptr = (char *)&sfConfig.sendPkt.udp;
+     ptr -= sizeof(struct udpmagichdr);
+-    // save what's there
++    /* save what's there */
+     memcpy(&saved, ptr, sizeof(struct udpmagichdr));
+-    // blat in the replacement bytes
++    /* blat in the replacement bytes */
+     memcpy(ptr, &h, sizeof(struct udpmagichdr));
+-    // compute the checksum
++    /* compute the checksum */
+     sfConfig.sendPkt.udp.uh_sum = 0;
+     sfConfig.sendPkt.udp.uh_sum = in_checksum((uint16_t *)ptr,
+ 					      ntohs(sfConfig.sendPkt.udp.uh_ulen) + sizeof(struct udpmagichdr));
+     if (sfConfig.sendPkt.udp.uh_sum == 0) sfConfig.sendPkt.udp.uh_sum = 0xffff;
+-    // copy the save bytes back again
++    /* copy the save bytes back again */
+     memcpy(ptr, &saved, sizeof(struct udpmagichdr));
+     
+-    { // now send the packet
++    { /* now send the packet */
+       int bytesSent;
+       struct sockaddr dest;
+       struct sockaddr_in *to = (struct sockaddr_in *)&dest;
+@@ -1393,7 +1393,7 @@
+     addr.sin_port = ntohs(sfConfig.netFlowOutputPort);
+     addr.sin_addr.s_addr = sfConfig.netFlowOutputIP.s_addr; 
+     
+-    // open an ordinary UDP socket
++    /* open an ordinary UDP socket */
+     if((sfConfig.netFlowOutputSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+       fprintf(ERROUT, "netflow output socket open failed\n");
+       exit(-4);
+@@ -1418,13 +1418,13 @@
+   NFFlowPkt5 pkt;
+   uint32_t now = (uint32_t)time(NULL);
+   uint32_t bytes;
+-  // ignore fragments
++  /* ignore fragments */
+   if(sample->ip_fragmentOffset > 0) return;
+-  // count the bytes from the start of IP header, with the exception that
+-  // for udp packets we use the udp_pduLen. This is because the udp_pduLen
+-  // can be up tp 65535 bytes, which causes fragmentation at the IP layer.
+-  // Since the sampled fragments are discarded, we have to use this field
+-  // to get the total bytes estimates right.
++  /* count the bytes from the start of IP header, with the exception that
++     for udp packets we use the udp_pduLen. This is because the udp_pduLen
++     can be up tp 65535 bytes, which causes fragmentation at the IP layer.
++     Since the sampled fragments are discarded, we have to use this field
++     to get the total bytes estimates right. */
+   if(sample->udp_pduLen > 0) bytes = sample->udp_pduLen;
+   else bytes = sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4;
+   
+@@ -1493,8 +1493,8 @@
+ 
+ static uint32_t getData32_nobswap(SFSample *sample) {
+   uint32_t ans = *(sample->datap)++;
+-  // make sure we didn't run off the end of the datagram.  Thanks to 
+-  // Sven Eschenberg for spotting a bug/overrun-vulnerabilty that was here before.
++  /* make sure we didn't run off the end of the datagram.  Thanks to 
++     Sven Eschenberg for spotting a bug/overrun-vulnerabilty that was here before. */
+   if((uint8_t *)sample->datap > sample->endp) {
+     SFABORT(sample, SF_ABORT_EOS);
+   }
+@@ -1565,10 +1565,10 @@
+ static uint32_t getString(SFSample *sample, char *buf, uint32_t bufLen) {
+   uint32_t len, read_len;
+   len = getData32(sample);
+-  // truncate if too long
++  /* truncate if too long */
+   read_len = (len >= bufLen) ? (bufLen - 1) : len;
+   memcpy(buf, sample->datap, read_len);
+-  buf[read_len] = '\0';   // null terminate
++  buf[read_len] = '\0';   /* null terminate */
+   skipBytes(sample, len);
+   return len;
+ }
+@@ -1585,7 +1585,7 @@
+ }
+ 
+ static char *printTag(uint32_t tag, char *buf) {
+-  // should really be: snprintf(buf, buflen,...) but snprintf() is not always available
++  /* should really be: snprintf(buf, buflen,...) but snprintf() is not always available */
+   sprintf(buf, "%u:%u", (tag >> 12), (tag & 0x00000FFF));
+   return buf;
+ }
+@@ -1650,8 +1650,8 @@
+   sample->src_as = getData32(sample);
+   sample->src_peer_as = getData32(sample);
+ 
+-  // clear dst_peer_as and dst_as to make sure we are not
+-  // remembering values from a previous sample - (thanks Marc Lavine)
++  /* clear dst_peer_as and dst_as to make sure we are not
++     remembering values from a previous sample - (thanks Marc Lavine) */
+   sample->dst_peer_as = 0;
+   sample->dst_as = 0;
+ 
+@@ -1661,7 +1661,7 @@
+     sample->dst_as_path = sample->datap;
+     /* and skip over it in the input */
+     skipBytes(sample, sample->dst_as_path_len * 4);
+-    // fill in the dst and dst_peer fields too
++    /* fill in the dst and dst_peer fields too */
+     sample->dst_peer_as = ntohl(sample->dst_as_path[0]);
+     sample->dst_as = ntohl(sample->dst_as_path[sample->dst_as_path_len - 1]);
+   }
+@@ -1711,8 +1711,8 @@
+   sf_log("src_peer_as %u\n", sample->src_peer_as);
+   segments = getData32(sample);
+ 
+-  // clear dst_peer_as and dst_as to make sure we are not
+-  // remembering values from a previous sample - (thanks Marc Lavine)
++  /* clear dst_peer_as and dst_as to make sure we are not
++     remembering values from a previous sample - (thanks Marc Lavine) */
+   sample->dst_peer_as = 0;
+   sample->dst_as = 0;
+ 
+@@ -1837,10 +1837,10 @@
+       else sf_log("-");
+       lab = ntohl(lstk.stack[j]);
+       sf_log("%u.%u.%u.%u",
+-	     (lab >> 12),     // label
+-	     (lab >> 9) & 7,  // experimental
+-	     (lab >> 8) & 1,  // bottom of stack
+-	     (lab &  255));   // TTL
++	     (lab >> 12),     /* label */
++	     (lab >> 9) & 7,  /* experimental */
++	     (lab >> 8) & 1,  /* bottom of stack */
++	     (lab &  255));   /* TTL */
+     }
+     sf_log("\n");
+   }
+@@ -1983,10 +1983,10 @@
+       else sf_log("-");
+       lab = ntohl(lstk.stack[j]);
+       sf_log("0x%04x.%u.%u.%u",
+-	     (lab >> 16),       // TPI
+-	     (lab >> 13) & 7,   // priority
+-	     (lab >> 12) & 1,   // CFI
+-	     (lab & 4095));     // VLAN
++	     (lab >> 16),       /* TPI */
++	     (lab >> 13) & 7,   /* priority */
++	     (lab >> 12) & 1,   /* CFI */
++	     (lab & 4095));     /* VLAN */
+     }
+     sf_log("\n");
+   }
+@@ -2091,7 +2091,7 @@
+   sample->sampledPacketSize = getData32(sample);
+   sf_log("sampledPacketSize %u\n", sample->sampledPacketSize);
+   if(sample->datagramVersion > 4) {
+-    // stripped count introduced in sFlow version 5
++    /* stripped count introduced in sFlow version 5 */
+     sample->stripped = getData32(sample);
+     sf_log("strippedBytes %u\n", sample->stripped);
+   }
+@@ -2143,12 +2143,12 @@
+   }
+   
+   if(sample->gotIPV4) {
+-    // report the size of the original IPPdu (including the IP header)
++    /* report the size of the original IPPdu (including the IP header) */
+     sf_log("IPSize %d\n",  sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4);
+     decodeIPV4(sample);
+   }
+   else if(sample->gotIPV6) {
+-    // report the size of the original IPPdu (including the IP header)
++    /* report the size of the original IPPdu (including the IP header) */
+     sf_log("IPSize %d\n",  sample->sampledPacketSize - sample->stripped - sample->offsetToIPV6);
+     decodeIPV6(sample);
+   }
+@@ -2745,7 +2745,7 @@
+   case 0: sf_log("outputPort %u\n", sample->outputPort); break;
+   }
+ 
+-  // clear the CLF record
++  /* clear the CLF record */
+   sfCLF.valid = NO;
+   sfCLF.client[0] = '\0';
+ 
+@@ -3672,7 +3672,7 @@
+   sf_log("datagramSourceIP %s\n", printAddress(&sample->sourceIP, buf));
+   sf_log("datagramSize %u\n", sample->rawSampleLen);
+   sf_log("unixSecondsUTC %u\n", now.tv_sec);
+-  if(sample->pcapTimestamp) sf_log("pcapTimestamp %s\n", ctime(&sample->pcapTimestamp)); // thanks to Richard Clayton for this bugfix
++  if(sample->pcapTimestamp) sf_log("pcapTimestamp %s\n", ctime(&sample->pcapTimestamp)); /* thanks to Richard Clayton for this bugfix */
+ 
+   /* check the version */
+   sample->datagramVersion = getData32(sample);
+@@ -3708,7 +3708,7 @@
+ 	fprintf(ERROUT, "unexpected end of datagram after sample %d of %d\n", samp, samplesInPacket);
+ 	SFABORT(sample, SF_ABORT_EOS);
+       }
+-      // just read the tag, then call the approriate decode fn
++      /* just read the tag, then call the approriate decode fn */
+       sample->sampleType = getData32(sample);
+       sf_log("startSample ----------------------\n");
+       sf_log("sampleType_tag %s\n", printTag(sample->sampleType, buf));
+@@ -3741,8 +3741,8 @@
+ static void receiveSFlowDatagram(SFSample *sample)
+ {
+   if(sfConfig.forwardingTargets) {
+-    // if we are forwarding, then do nothing else (it might
+-    // be important from a performance point of view).
++    /* if we are forwarding, then do nothing else (it might
++       be important from a performance point of view). */
+     SFForwardingTarget *tgt = sfConfig.forwardingTargets;
+     for( ; tgt != NULL; tgt = tgt->nxt) {
+       int bytesSent;
+@@ -3763,13 +3763,13 @@
+     int exceptionVal;
+     sf_log("startDatagram =================================\n");
+     if((exceptionVal = setjmp(sample->env)) == 0)  {
+-      // TRY
++      /* TRY */
+       sample->datap = (uint32_t *)sample->rawSample;
+       sample->endp = (uint8_t *)sample->rawSample + sample->rawSampleLen;
+       readSFlowDatagram(sample);
+     }
+     else {
+-      // CATCH
++      /* CATCH */
+       fprintf(ERROUT, "caught exception: %d\n", exceptionVal);
+     }
+     sf_log("endDatagram   =================================\n");
+@@ -3793,7 +3793,7 @@
+   /* Create socket */
+   memset((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
+   myaddr_in.sin_family = AF_INET;
+-  //myaddr_in6.sin6_addr.s_addr = INADDR_ANY;
++  /* myaddr_in6.sin6_addr.s_addr = INADDR_ANY; */
+   myaddr_in.sin_port = htons(port);
+   
+   if ((soc = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+@@ -3832,7 +3832,7 @@
+   /* Create socket */
+   memset((char *)&myaddr_in6, 0, sizeof(struct sockaddr_in6));
+   myaddr_in6.sin6_family = AF_INET6;
+-  //myaddr_in6.sin6_addr = INADDR_ANY;
++  /* myaddr_in6.sin6_addr = INADDR_ANY; */
+   myaddr_in6.sin6_port = htons(port);
+   
+   if ((soc = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+@@ -3932,10 +3932,10 @@
+   uint8_t *ptr = start;
+   uint16_t type_len;
+ 
+-  // assume Ethernet header
++  /* assume Ethernet header */
+   if(len < NFT_ETHHDR_SIZ) return -1; /* not enough for an Ethernet header */
+-  ptr += 6; // dst
+-  ptr += 6; // src
++  ptr += 6; /* dst */
++  ptr += 6; /* src */
+   type_len = (ptr[0] << 8) + ptr[1];
+   ptr += 2;
+ 
+@@ -4021,7 +4021,7 @@
+     ptr += 40;
+   }
+ 
+-  // still have to skip over UDP header
++  /* still have to skip over UDP header */
+   ptr += 8;
+   if(ptr >= end) return -1;
+   return (ptr - start);
+@@ -4066,9 +4066,9 @@
+     fprintf(ERROUT, "incomplete datagram (pcap snaplen too short)\n");
+   }
+   else {
+-    // need to skip over the encapsulation in the captured packet.
+-    // -- should really do this by checking for 802.2, IP options etc.  but
+-    // for now we just assume ethernet + IP + UDP
++    /* need to skip over the encapsulation in the captured packet.
++       -- should really do this by checking for 802.2, IP options etc.  but
++       for now we just assume ethernet + IP + UDP */
+     skipBytes = pcapOffsetToSFlow(buf, hdr.caplen);
+     memset(&sample, 0, sizeof(sample));
+     sample.rawSample = buf + skipBytes;
+@@ -4105,21 +4105,21 @@
+   char *sep = " ,";
+   do {
+ 	uint32_t first, last;
+-    p += strspn(p, sep); // skip separators
++    p += strspn(p, sep); /* skip separators */
+     peekForNumber(p);
+-    first = strtol(p, &p, 0); // read an integer
++    first = strtol(p, &p, 0); /* read an integer */
+     testVlan(first);
+     array[first] = flag;
+     if(*p == '-') {
+-      // a range. skip the '-' (so it doesn't get interpreted as unary minus)
++      /* a range. skip the '-' (so it doesn't get interpreted as unary minus) */
+       p++;
+-      // and read the second integer
++      /* and read the second integer */
+       peekForNumber(p);
+       last = strtol(p, &p, 0);
+       testVlan(last);
+       if(last > first) {
+ 	uint32_t i;
+-	// iterate over the range
++	/* iterate over the range */
+ 	for(i = first; i <= last; i++) array[i] = flag;
+       }
+     }
+@@ -4136,7 +4136,7 @@
+ static int addForwardingTarget(char *hostandport)
+ {
+   SFForwardingTarget *tgt = (SFForwardingTarget *)calloc(1, sizeof(SFForwardingTarget));
+-  // expect <host>/<port>
++  /* expect <host>/<port> */
+ #define MAX_HOSTANDPORT_LEN 100
+   char hoststr[MAX_HOSTANDPORT_LEN+1];
+   char *p;
+@@ -4145,18 +4145,18 @@
+     return NO;
+   }
+   if(strlen(hostandport) > MAX_HOSTANDPORT_LEN) return NO;
+-  // take a copy
++  /* take a copy */
+   strcpy(hoststr, hostandport);
+-  // find the '/'
++  /* find the '/' */
+   for(p = hoststr; *p != '\0'; p++) if(*p == '/') break;
+   if(*p == '\0') {
+-    // not found
++    /* not found */
+     fprintf(ERROUT, "host/port - no '/' found\n");
+     return NO;
+   }
+-  (*p) = '\0'; // blat in a zero
++  (*p) = '\0'; /* blat in a zero */
+   p++;
+-  // now p points to port string, and hoststr is just the hostname or IP
++  /* now p points to port string, and hoststr is just the hostname or IP */
+   {
+     struct hostent *ent = gethostbyname(hoststr);
+     if(ent == NULL) {
+@@ -4338,14 +4338,14 @@
+       break;
+     case 'v':
+       if(plus) {
+-	// +v => include vlans
++	/* +v => include vlans */
+ 	sfConfig.gotVlanFilter = YES;
+ 	parseVlanFilter(sfConfig.vlanFilter, YES, argv[arg++]);
+       }
+       else {
+-	// -v => exclude vlans
++	/* -v => exclude vlans */
+ 	if(! sfConfig.gotVlanFilter) {
+-	  // when we start with an exclude list, that means the default should be YES
++	  /* when we start with an exclude list, that means the default should be YES */
+ 	  for(i = 0; i < FILTER_MAX_VLAN; i++) sfConfig.vlanFilter[i] = YES;
+ 	  sfConfig.gotVlanFilter = YES;
+ 	}
+@@ -4387,7 +4387,7 @@
+   process_command_line(argc, argv);
+ 
+ #ifdef WIN32
+-  // on windows we need to tell stdout if we want it to be binary
++  /* on windows we need to tell stdout if we want it to be binary */
+   if(sfConfig.outputFormat == SFLFMT_PCAP) setmode(1, O_BINARY);
+ #endif
+ 
+--- a/src/sflow.h
++++ b/src/sflow.h
+@@ -1,9 +1,11 @@
+ /* Copyright (c) 2002-2011 InMon Corp. Licensed under the terms of the InMon sFlow licence: */
+ /* http://www.inmon.com/technology/sflowlicense.txt */
+ 
++/*
+ /////////////////////////////////////////////////////////////////////////////////
+ /////////////////////// sFlow Sampling Packet Data Types ////////////////////////
+ /////////////////////////////////////////////////////////////////////////////////
++*/
+ 
+ #ifndef SFLOW_H
+ #define SFLOW_H 1
+@@ -274,9 +276,10 @@
+ 			  innermost. */ 
+ } SFLExtended_vlan_tunnel;
+ 
+-  ////////////////// IEEE 802.11 Extension structs ////////////////////
++/*
++   ////////////////// IEEE 802.11 Extension structs ////////////////////
+ 
+-/* The 4-byte cipher_suite identifier follows the format of the cipher suite
++   The 4-byte cipher_suite identifier follows the format of the cipher suite
+    selector value from the 802.11i (TKIP/CCMP amendment to 802.11i)
+    The most significant three bytes contain the OUI and the least significant
+    byte contains the Suite Type.
+@@ -374,7 +377,7 @@
+ 
+ /* opaque = flow_data; enterprise = 0; format = 1016 */
+ 
+-struct _SFLFlow_Pdu; // forward decl
++struct _SFLFlow_Pdu; /* forward decl */
+ 
+ typedef struct _SFLExtended_aggregation {
+   uint32_t num_pdus;
+@@ -1066,13 +1069,13 @@
+ } SFLHost_gpu_nvml;
+ 
+ typedef struct _SFLMemcache_counters {
+-  uint32_t uptime;          // not in 2204
+-  uint32_t rusage_user;     // not in 2204
+-  uint32_t rusage_system;   // not in 2204
+-  uint32_t cmd_get;         // not in 2204
+-  uint32_t accepting_conns; // not in 2204
++  uint32_t uptime;          /* not in 2204 */
++  uint32_t rusage_user;     /* not in 2204 */
++  uint32_t rusage_system;   /* not in 2204 */
++  uint32_t cmd_get;         /* not in 2204 */
++  uint32_t accepting_conns; /* not in 2204 */
+   uint32_t cmd_set;
+-  uint32_t cmd_touch;  // added for 2204
++  uint32_t cmd_touch;  /* added for 2204 */
+   uint32_t cmd_flush;
+   uint32_t get_hits;
+   uint32_t get_misses;
+@@ -1091,17 +1094,17 @@
+   uint32_t conn_yields;
+   uint32_t listen_disabled_num;
+   uint32_t curr_connections;
+-  uint32_t rejected_connections; // added for 2204
++  uint32_t rejected_connections; /* added for 2204 */
+   uint32_t total_connections;
+   uint32_t connection_structures;
+   uint32_t evictions;
+-  uint32_t reclaimed; // added for 2204
++  uint32_t reclaimed; /* added for 2204 */
+   uint32_t curr_items;
+   uint32_t total_items;
+   uint64_t bytes_read;
+   uint64_t bytes_written;
+   uint64_t bytes;
+-  uint64_t limit_maxbytes; // converted to 64-bit for structure 2204
++  uint64_t limit_maxbytes; /* converted to 64-bit for structure 2204 */
+ } SFLMemcache_counters;
+ 
+ typedef struct _SFLHTTP_counters {
+@@ -1250,8 +1253,8 @@
+ } SFLLACP_portState;
+ 
+ typedef struct _SFLLACP_counters {
+-  uint8_t actorSystemID[8]; // 6 bytes + 2 pad
+-  uint8_t partnerSystemID[8]; // 6 bytes + 2 pad
++  uint8_t actorSystemID[8]; /* 6 bytes + 2 pad */
++  uint8_t partnerSystemID[8]; /* 6 bytes + 2 pad */
+   uint32_t attachedAggID;
+   SFLLACP_portState portState;
+   uint32_t LACPDUsRx;
