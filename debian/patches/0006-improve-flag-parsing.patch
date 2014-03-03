@@ -1,0 +1,79 @@
+Description: Improve flag-parsing, usage-text and exit codes for them
+ Because there is an initial error-check pass of flags before the processing
+ pass, this patch makes the first pass include *all* error-checking, including
+ for flags without args, for consistency. Also, calls to instructions() are
+ tweaked to allow calls with -h or -? to exit(0), contrasting exit(1) for
+ incorrect invocations. Lastly, -h and -? are documented in instructions().
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2014-03-03
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -4152,6 +4152,9 @@
+   fprintf(ERROUT,"\n");
+   fprintf(ERROUT,"%s version: %s\n", command, VERSION);
+   fprintf(ERROUT,"\n");
++  fprintf(ERROUT,"usage:\n");
++  fprintf(ERROUT, "   -h | -?            -  this help message\n");
++  fprintf(ERROUT,"\n");
+   fprintf(ERROUT,"forwarding:\n");
+   fprintf(ERROUT, "   -f host/port       -  (forward sflow to another collector\n");
+   fprintf(ERROUT, "                      -   ...repeat for multiple collectors)\n");
+@@ -4187,7 +4190,6 @@
+   fprintf(ERROUT, "| sFlowTrend (FREE)     - http://www.inmon.com/products/sFlowTrend.php      |\n");
+   fprintf(ERROUT, "| Traffic Sentinel      - http://www.inmon.com/support/sentinel_release.php |\n");
+   fprintf(ERROUT, "=============================================================================\n");
+-  exit(1);
+ }
+ 
+ /*_________________---------------------------__________________
+@@ -4215,20 +4217,31 @@
+   while (arg < argc) {
+     plus = (argv[arg][0] == '+');
+     minus = (argv[arg][0] == '-');
+-    if(plus == NO && minus == NO) instructions(*argv);
++    if(plus == NO && minus == NO) { instructions(*argv); exit(1); }
+     in = argv[arg++][1];
+-    /* some options expect an argument - check for that first */
++    /* check first that options with/without arguments are correct */
+     switch(in) {
++    case 't':
++    case 'l':
++    case 'H':
++    case 'x':
++    case 'e':
++    case 's':
++#ifdef SPOOFSOURCE
++    case 'S':
++#endif
++    case '4':
++    case '6':
++    case '?':
++    case 'h': break;
+     case 'p':
+     case 'r':
+     case 'z':
+     case 'c':
+     case 'd':
+     case 'f':
+-    case 'v':
+-      if(arg >= argc) instructions(*argv);
+-      break;
+-    default: break;
++    case 'v': if(arg < argc) break;
++    default: instructions(*argv); exit(1);
+     }
+ 
+     switch(in) {
+@@ -4289,9 +4302,8 @@
+       sfConfig.listen4 = NO;
+       sfConfig.listen6 = YES;
+       break;
+-    case '?':
+-    case 'h':
+-    default: instructions(*argv);
++    /* remaining are -h or -? */
++    default: instructions(*argv); exit(0);
+     }
+   }
+ }

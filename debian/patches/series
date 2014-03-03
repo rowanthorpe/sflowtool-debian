@@ -1,3 +1,4 @@
 0000-move-configure.in-to-configure.ac.patch
 0004-examples-interpreter-locations.patch
 0005-fix-strdup-mem-leak.patch
+0006-improve-flag-parsing.patch
