@@ -1,0 +1,39 @@
+Description: Comment unused function definitions to silence compiler warnings
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2014-03-03
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -640,6 +640,7 @@
+   -----------------___________________________------------------
+ */
+ 
++/* -- this seems completely unused. commenting out for now
+ static void dumpSample(SFSample *sample)
+ {
+   uint8_t hex[6000];
+@@ -649,7 +650,7 @@
+     exit(-47);
+   }
+ }
+-
++*/
+ 
+ static void receiveError(SFSample *sample, char *errm, int hexdump)
+ {
+@@ -2065,6 +2066,7 @@
+   -----------------___________________________------------------
+ */
+ 
++/* -- commenting this out until its caller is uncommented too
+ static void readExtendedAggregation(SFSample *sample)
+ {
+   uint32_t i, num_pdus = getData32(sample);
+@@ -2074,6 +2076,7 @@
+     readFlowSample(sample, NO); // not sure if this the right one here $$$
+   }
+ }
++*/
+ 
+ /*_________________---------------------------__________________
+   _________________  readFlowSample_header    __________________

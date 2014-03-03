@@ -6,3 +6,4 @@
 0008-update-deprecated-gethostbyname-format.patch
 0009-add-missing-include.patch
 0010-strict-ansi-types-coercions-syntax.patch
+0011-comment-unused-functions.patch
