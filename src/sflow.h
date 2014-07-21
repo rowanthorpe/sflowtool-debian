@@ -1,9 +1,11 @@
 /* Copyright (c) 2002-2011 InMon Corp. Licensed under the terms of the InMon sFlow licence: */
 /* http://www.inmon.com/technology/sflowlicense.txt */
 
+/*
 /////////////////////////////////////////////////////////////////////////////////
 /////////////////////// sFlow Sampling Packet Data Types ////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
+*/
 
 #ifndef SFLOW_H
 #define SFLOW_H 1
@@ -273,9 +275,10 @@ typedef struct _SFLExtended_vlan_tunnel {
 			  innermost. */ 
 } SFLExtended_vlan_tunnel;
 
-  ////////////////// IEEE 802.11 Extension structs ////////////////////
+/*
+   ////////////////// IEEE 802.11 Extension structs ////////////////////
 
-/* The 4-byte cipher_suite identifier follows the format of the cipher suite
+   The 4-byte cipher_suite identifier follows the format of the cipher suite
    selector value from the 802.11i (TKIP/CCMP amendment to 802.11i)
    The most significant three bytes contain the OUI and the least significant
    byte contains the Suite Type.
@@ -373,7 +376,7 @@ typedef struct _SFLExtended_wifi_tx {
 
 /* opaque = flow_data; enterprise = 0; format = 1016 */
 
-struct _SFLFlow_Pdu; // forward decl
+struct _SFLFlow_Pdu; /* forward decl */
 
 typedef struct _SFLExtended_aggregation {
   uint32_t num_pdus;
@@ -1065,13 +1068,13 @@ typedef struct _SFLHost_gpu_nvml {
 } SFLHost_gpu_nvml;
 
 typedef struct _SFLMemcache_counters {
-  uint32_t uptime;          // not in 2204
-  uint32_t rusage_user;     // not in 2204
-  uint32_t rusage_system;   // not in 2204
-  uint32_t cmd_get;         // not in 2204
-  uint32_t accepting_conns; // not in 2204
+  uint32_t uptime;          /* not in 2204 */
+  uint32_t rusage_user;     /* not in 2204 */
+  uint32_t rusage_system;   /* not in 2204 */
+  uint32_t cmd_get;         /* not in 2204 */
+  uint32_t accepting_conns; /* not in 2204 */
   uint32_t cmd_set;
-  uint32_t cmd_touch;  // added for 2204
+  uint32_t cmd_touch;  /* added for 2204 */
   uint32_t cmd_flush;
   uint32_t get_hits;
   uint32_t get_misses;
@@ -1090,17 +1093,17 @@ typedef struct _SFLMemcache_counters {
   uint32_t conn_yields;
   uint32_t listen_disabled_num;
   uint32_t curr_connections;
-  uint32_t rejected_connections; // added for 2204
+  uint32_t rejected_connections; /* added for 2204 */
   uint32_t total_connections;
   uint32_t connection_structures;
   uint32_t evictions;
-  uint32_t reclaimed; // added for 2204
+  uint32_t reclaimed; /* added for 2204 */
   uint32_t curr_items;
   uint32_t total_items;
   uint64_t bytes_read;
   uint64_t bytes_written;
   uint64_t bytes;
-  uint64_t limit_maxbytes; // converted to 64-bit for structure 2204
+  uint64_t limit_maxbytes; /* converted to 64-bit for structure 2204 */
 } SFLMemcache_counters;
 
 typedef struct _SFLHTTP_counters {
@@ -1249,8 +1252,8 @@ typedef  union _SFLLACP_portState {
 } SFLLACP_portState;
 
 typedef struct _SFLLACP_counters {
-  uint8_t actorSystemID[8]; // 6 bytes + 2 pad
-  uint8_t partnerSystemID[8]; // 6 bytes + 2 pad
+  uint8_t actorSystemID[8]; /* 6 bytes + 2 pad */
+  uint8_t partnerSystemID[8]; /* 6 bytes + 2 pad */
   uint32_t attachedAggID;
   SFLLACP_portState portState;
   uint32_t LACPDUsRx;
@@ -1265,6 +1268,14 @@ typedef struct _SFLLACP_counters {
 
 #define XDRSIZ_LACP_COUNTERS 56
 
+/* port name */
+/* opaque = counter_data; enterprise = 0; format = 1005 */
+typedef struct {
+  SFLString portName;
+} SFLPortName;
+
+#define SFL_MAX_PORTNAME_LEN 255
+
 /* Counters data */
 
 enum SFLCounters_type_tag {
@@ -1278,6 +1289,7 @@ enum SFLCounters_type_tag {
   SFLCOUNTERS_LACP         = 7,
   SFLCOUNTERS_PROCESSOR    = 1001,
   SFLCOUNTERS_RADIO        = 1002,
+  SFLCOUNTERS_PORTNAME     = 1005,
   SFLCOUNTERS_HOST_HID     = 2000, /* host id */
   SFLCOUNTERS_ADAPTORS     = 2001, /* host adaptors */
   SFLCOUNTERS_HOST_PAR     = 2002, /* host parent */
@@ -1333,6 +1345,7 @@ typedef union _SFLCounters_type {
   SFLAPP_workers appWorkers;
   SFLVdi_counters vdi;
   SFLLACP_counters lacp;
+  SFLPortName portName;
 } SFLCounters_type;
 
 typedef struct _SFLCounters_sample_element {
