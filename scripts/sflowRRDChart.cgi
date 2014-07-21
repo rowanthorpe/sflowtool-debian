@@ -1,4 +1,4 @@
-#! /usr/local/rrdtool-1.0.33/bin/rrdcgi
+#!/usr/bin/rrdcgi
 # Copyright (c) 2001 InMon Corp. Licensed under the terms of the InMon sFlow licence:
 # http://www.inmon.com/technology/sflowlicense.txt
 <HTML>

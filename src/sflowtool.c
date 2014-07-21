@@ -20,6 +20,7 @@ extern "C" {
 #include <fcntl.h>
 #include <time.h>
 #include <setjmp.h>
+#include <ctype.h>
 
 #ifdef WIN32 
 #else
@@ -33,10 +34,10 @@ extern "C" {
 #include <inttypes.h>
 #endif
 
-#include "sflow.h" // sFlow v5
-#include "sflowtool.h" // sFlow v2/4
+#include "sflow.h" /* sFlow v5 */
+#include "sflowtool.h" /* sFlow v2/4 */
 
-// If the platform is Linux, enable the source-spoofing feature too.
+/* If the platform is Linux, enable the source-spoofing feature too. */
 #ifdef linux
 #define SPOOFSOURCE 1
 #endif
@@ -123,7 +124,7 @@ struct myicmphdr
 struct mySendPacket {
   struct myiphdr ip;
   struct myudphdr udp;
-  u_char data[SPOOFSOURCE_SENDPACKET_SIZE];
+  uint8_t data[SPOOFSOURCE_SENDPACKET_SIZE];
 };
 #endif
 
@@ -161,7 +162,7 @@ typedef struct _SFForwardingTarget {
   int sock;
 } SFForwardingTarget;
 
-typedef enum { SFLFMT_FULL=0, SFLFMT_PCAP, SFLFMT_LINE, SFLFMT_NETFLOW, SFLFMT_FWD, SFLFMT_CLF } EnumSFLFormat;
+typedef enum { SFLFMT_FULL=0, SFLFMT_PCAP, SFLFMT_LINE, SFLFMT_NETFLOW, SFLFMT_FWD, SFLFMT_CLF, SFLFMT_SCRIPT } EnumSFLFormat;
 
 typedef struct _SFConfig {
   /* sflow(R) options */
@@ -179,7 +180,7 @@ typedef struct _SFConfig {
   char *writePcapFile;
   EnumSFLFormat outputFormat;
   uint32_t tcpdumpHdrPad;
-  u_char zeroPad[100];
+  uint8_t zeroPad[100];
   int pcapSwap;
 
 #ifdef SPOOFSOURCE
@@ -194,7 +195,7 @@ typedef struct _SFConfig {
   /* vlan filtering */
   int gotVlanFilter;
 #define FILTER_MAX_VLAN 4096
-  u_char vlanFilter[FILTER_MAX_VLAN + 1];
+  uint8_t vlanFilter[FILTER_MAX_VLAN + 1];
 
   /* content stripping */
   int removeContent;
@@ -203,6 +204,9 @@ typedef struct _SFConfig {
   int listen4;
   int listen6;
   int listenControlled;
+
+  /* general options */
+  int keepGoing;
 } SFConfig;
 
 /* make the options structure global to the program */
@@ -225,9 +229,9 @@ typedef struct _SFSample {
   uint32_t agentSubId;
 
   /* the raw pdu */
-  u_char *rawSample;
+  uint8_t *rawSample;
   uint32_t rawSampleLen;
-  u_char *endp;
+  uint8_t *endp;
   time_t pcapTimestamp;
 
   /* decode cursor */
@@ -235,6 +239,7 @@ typedef struct _SFSample {
 
   uint32_t datagramVersion;
   uint32_t sampleType;
+  uint32_t elementType;
   uint32_t ds_class;
   uint32_t ds_index;
 
@@ -253,7 +258,7 @@ typedef struct _SFSample {
   /* the sampled header */
   uint32_t packet_data_tag;
   uint32_t headerProtocol;
-  u_char *header;
+  uint8_t *header;
   int headerLen;
   uint32_t stripped;
 
@@ -285,8 +290,8 @@ typedef struct _SFSample {
   /* ethernet */
   uint32_t eth_type;
   uint32_t eth_len;
-  u_char eth_src[8];
-  u_char eth_dst[8];
+  uint8_t eth_src[8];
+  uint8_t eth_dst[8];
 
   /* vlan */
   uint32_t in_vlan;
@@ -427,16 +432,51 @@ typedef struct _NFFlowPkt5 {
 
 static void readFlowSample_header(SFSample *sample);
 static void readFlowSample(SFSample *sample, int expanded);
+static char *printTag(uint32_t tag, char *buf);
+static char *printAddress(SFLAddress *address, char *buf);
+
+/*_________________---------------------------__________________
+  _________________     heap allocation       __________________
+  -----------------___________________________------------------
+*/
+void *my_calloc(size_t bytes) {
+  void *mem = calloc(1, bytes);
+  if(mem == NULL) {
+    fprintf(ERROUT, "calloc(%u) failed: %s\n", bytes, strerror(errno));
+    exit(-1);
+  }
+  return mem;
+}
+
+void my_free(void *ptr) {
+  if(ptr) {
+    free(ptr);
+  }
+}
 
 /*_________________---------------------------__________________
   _________________        sf_log             __________________
   -----------------___________________________------------------
 */
 
-void sf_log(char *fmt, ...)
+void sf_log(SFSample *sample, char *fmt, ...)
 {
   /* don't print anything if we are exporting tcpdump format or tabular format instead */
-  if(sfConfig.outputFormat == SFLFMT_FULL) {
+
+  if(sfConfig.outputFormat == SFLFMT_SCRIPT) {
+    /* scripts like to have all the context on every line */
+    char agentIP[51], tag1[51], tag2[51];
+    printf("%s %u %u %u:%u %s %s ",
+	   printAddress(&sample->agent_addr, agentIP),
+	   sample->agentSubId,
+	   sample->sequenceNo,
+	   sample->ds_class,
+	   sample->ds_index,
+	   printTag(sample->sampleType, tag1),
+	   printTag(sample->elementType, tag2));
+  }   
+  if(sfConfig.outputFormat == SFLFMT_FULL
+     || sfConfig.outputFormat == SFLFMT_SCRIPT) {
     va_list args;
     va_start(args, fmt);
     if(vprintf(fmt, args) < 0) {
@@ -450,13 +490,13 @@ void sf_log(char *fmt, ...)
   -----------------___________________________------------------
 */
 
-static u_char bin2hex(int nib) { return (nib < 10) ? ('0' + nib) : ('A' - 10 + nib); }
+static uint8_t bin2hex(int nib) { return (nib < 10) ? ('0' + nib) : ('A' - 10 + nib); }
 
-int printHex(const u_char *a, int len, u_char *buf, int bufLen, int marker, int bytesPerOutputLine)
+int printHex(const uint8_t *a, int len, uint8_t *buf, int bufLen, int marker, int bytesPerOutputLine)
 {
   int b = 0, i = 0;
   for(; i < len; i++) {
-    u_char byte;
+    uint8_t byte;
     if(b > (bufLen - 10)) break;
     if(marker > 0 && i == marker) {
       buf[b++] = '<';
@@ -469,7 +509,7 @@ int printHex(const u_char *a, int len, u_char *buf, int bufLen, int marker, int 
     buf[b++] = bin2hex(byte & 0x0f);
     if(i > 0 && (i % bytesPerOutputLine) == 0) buf[b++] = '\n';
     else {
-      // separate the bytes with a dash
+      /* separate the bytes with a dash */
       if (i < (len - 1)) buf[b++] = '-';
     }
   }
@@ -508,19 +548,27 @@ char *URLEncode(char *in, char *out, int outlen)
 
 char *IP_to_a(uint32_t ipaddr, char *buf)
 {
-  u_char *ip = (u_char *)&ipaddr;
+  uint8_t *ip = (uint8_t *)&ipaddr;
+  /* should really be: snprintf(buf, buflen,...) but snprintf() is not always available */
   sprintf(buf, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
   return buf;
 }
 
-static char *printAddress(SFLAddress *address, char *buf, int bufLen) {
-  if(address->type == SFLADDRESSTYPE_IP_V4)
+static char *printAddress(SFLAddress *address, char *buf) {
+  switch(address->type) {
+  case SFLADDRESSTYPE_IP_V4:
     IP_to_a(address->address.ip_v4.addr, buf);
-  else {
-    u_char *b = address->address.ip_v6.addr;
-    // should really be: snprintf(buf, buflen,...) but snprintf() is not always available
-    sprintf(buf, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
-	    b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],b[9],b[10],b[11],b[12],b[13],b[14],b[15]);
+    break;
+  case SFLADDRESSTYPE_IP_V6:
+    {
+      uint8_t *b = address->address.ip_v6.addr;
+      /* should really be: snprintf(buf, buflen,...) but snprintf() is not always available */
+      sprintf(buf, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+	      b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],b[9],b[10],b[11],b[12],b[13],b[14],b[15]);
+    }
+    break;
+  default:
+    sprintf(buf, "-");
   }
   return buf;
 }
@@ -532,10 +580,10 @@ static char *printAddress(SFLAddress *address, char *buf, int bufLen) {
 
 int sampleFilterOK(SFSample *sample)
 {
-  // the vlan filter will only reject a sample if both in_vlan and out_vlan are rejected. If the
-  // vlan was not reported in an SFLExtended_Switch struct, but was only picked up from the 802.1q header
-  // then the out_vlan will be 0,  so to be sure you are rejecting vlan 1,  you may need to reject both
-  // vlan 0 and vlan 1.
+  /* the vlan filter will only reject a sample if both in_vlan and out_vlan are rejected. If the
+     vlan was not reported in an SFLExtended_Switch struct, but was only picked up from the 802.1q header
+     then the out_vlan will be 0,  so to be sure you are rejecting vlan 1,  you may need to reject both
+     vlan 0 and vlan 1. */
   return(sfConfig.gotVlanFilter == NO
 	 || sfConfig.vlanFilter[sample->in_vlan]
 	 || sfConfig.vlanFilter[sample->out_vlan]);
@@ -549,14 +597,14 @@ int sampleFilterOK(SFSample *sample)
 static void writeFlowLine(SFSample *sample)
 {
   char agentIP[51], srcIP[51], dstIP[51];
-  // source
+  /* source */
   if(printf("FLOW,%s,%d,%d,",
-	    printAddress(&sample->agent_addr, agentIP, 50),
+	    printAddress(&sample->agent_addr, agentIP),
 	    sample->inputPort,
 	    sample->outputPort) < 0) {
     exit(-41);
   }
-  // layer 2
+  /* layer 2 */
   if(printf("%02x%02x%02x%02x%02x%02x,%02x%02x%02x%02x%02x%02x,0x%04x,%d,%d",
 	    sample->eth_src[0],
 	    sample->eth_src[1],
@@ -575,10 +623,10 @@ static void writeFlowLine(SFSample *sample)
 	    sample->out_vlan) < 0) {
     exit(-42);
   }
-  // layer 3/4
+  /* layer 3/4 */
   if(printf(",%s,%s,%d,0x%02x,%d,%d,%d,0x%02x",
-	    printAddress(&sample->ipsrc, srcIP, 50),
-	    printAddress(&sample->ipdst, dstIP, 50),
+	    printAddress(&sample->ipsrc, srcIP),
+	    printAddress(&sample->ipdst, dstIP),
 	    sample->dcd_ipProtocol,
 	    sample->dcd_ipTos,
 	    sample->dcd_ipTTL,
@@ -587,7 +635,7 @@ static void writeFlowLine(SFSample *sample)
 	    sample->dcd_tcpFlags) < 0) {
     exit(-43);
   }
-  // bytes
+  /* bytes */
   if(printf(",%d,%d,%d\n",
 	    sample->sampledPacketSize,
 	    sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4,
@@ -603,9 +651,9 @@ static void writeFlowLine(SFSample *sample)
 
 static void writeCountersLine(SFSample *sample)
 {
-  // source
+  /* source */
   char agentIP[51];
-  if(printf("CNTR,%s,", printAddress(&sample->agent_addr, agentIP, 50)) < 0) {
+  if(printf("CNTR,%s,", printAddress(&sample->agent_addr, agentIP)) < 0) {
     exit(-45);
   }
   if(printf("%u,%u,%"PRIu64",%u,%u,%"PRIu64",%u,%u,%u,%u,%u,%u,%"PRIu64",%u,%u,%u,%u,%u,%u\n",
@@ -637,32 +685,21 @@ static void writeCountersLine(SFSample *sample)
   -----------------___________________________------------------
 */
 
-static void dumpSample(SFSample *sample)
-{
-  u_char hex[6000];
-  uint32_t markOffset = (u_char *)sample->datap - sample->rawSample;
-  printHex(sample->rawSample, sample->rawSampleLen, hex, 6000, markOffset, 16);
-  if(printf("dumpSample:\n%s\n", hex) < 0) {
-    exit(-47);
-  }
-}
-
-
 static void receiveError(SFSample *sample, char *errm, int hexdump)
 {
   char ipbuf[51];
   char scratch[6000];
   char *msg = "";
   char *hex = "";
-  uint32_t markOffset = (u_char *)sample->datap - sample->rawSample;
+  uint32_t markOffset = (uint8_t *)sample->datap - sample->rawSample;
   if(errm) msg = errm;
   if(hexdump) {
-    printHex(sample->rawSample, sample->rawSampleLen, (u_char *)scratch, 6000, markOffset, 16);
+    printHex(sample->rawSample, sample->rawSampleLen, (uint8_t *)scratch, 6000, markOffset, 16);
     hex = scratch;
   }
   fprintf(ERROUT, "%s (source IP = %s) %s\n",
 	  msg,
-	  printAddress(&sample->sourceIP, ipbuf, 50),
+	  printAddress(&sample->sourceIP, ipbuf),
 	  hex);
 
   SFABORT(sample, SF_ABORT_DECODE_ERROR);
@@ -673,8 +710,8 @@ static void receiveError(SFSample *sample, char *errm, int hexdump)
   -----------------___________________________------------------
 */
 
-static void lengthCheck(SFSample *sample, char *description, u_char *start, int len) {
-  uint32_t actualLen = (u_char *)sample->datap - start;
+static void lengthCheck(SFSample *sample, char *description, uint8_t *start, int len) {
+  uint32_t actualLen = (uint8_t *)sample->datap - start;
   uint32_t adjustedLen = ((len + 3) >> 2) << 2;
   if(actualLen != adjustedLen) {
     fprintf(ERROUT, "%s length error (expected %d, found %d)\n", description, len, actualLen);
@@ -697,9 +734,9 @@ static void lengthCheck(SFSample *sample, char *description, u_char *start, int 
 
 static void decodeLinkLayer(SFSample *sample)
 {
-  u_char *start = (u_char *)sample->header;
-  u_char *end = start + sample->headerLen;
-  u_char *ptr = start;
+  uint8_t *start = (uint8_t *)sample->header;
+  uint8_t *end = start + sample->headerLen;
+  uint8_t *ptr = start;
   uint16_t type_len;
 
   /* assume not found */
@@ -708,11 +745,11 @@ static void decodeLinkLayer(SFSample *sample)
 
   if(sample->headerLen < NFT_ETHHDR_SIZ) return; /* not enough for an Ethernet header */
 
-  sf_log("dstMAC %02x%02x%02x%02x%02x%02x\n", ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5]);
+  sf_log(sample,"dstMAC %02x%02x%02x%02x%02x%02x\n", ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5]);
   memcpy(sample->eth_dst, ptr, 6);
   ptr += 6;
 
-  sf_log("srcMAC %02x%02x%02x%02x%02x%02x\n", ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5]);
+  sf_log(sample,"srcMAC %02x%02x%02x%02x%02x%02x\n", ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5]);
   memcpy(sample->eth_src, ptr, 6);
   ptr += 6;
   type_len = (ptr[0] << 8) + ptr[1];
@@ -728,8 +765,8 @@ static void decodeLinkLayer(SFSample *sample)
     /* |   pri  | c |         vlan-id        | */
     /*  ------------------------------------- */
     /* [priority = 3bits] [Canonical Format Flag = 1bit] [vlan-id = 12 bits] */
-    sf_log("decodedVLAN %u\n", vlan);
-    sf_log("decodedPriority %u\n", priority);
+    sf_log(sample,"decodedVLAN %u\n", vlan);
+    sf_log(sample,"decodedPriority %u\n", priority);
     sample->in_vlan = vlan;
     /* now get the type_len again (next two bytes) */
     type_len = (ptr[0] << 8) + ptr[1];
@@ -762,7 +799,7 @@ static void decodeLinkLayer(SFSample *sample)
       if(ptr[0] != 0 ||
 	 ptr[1] != 0 ||
 	 ptr[2] != 0) {
-	sf_log("VSNAP_OUI %02X-%02X-%02X\n", ptr[0], ptr[1], ptr[2]);
+	sf_log(sample,"VSNAP_OUI %02X-%02X-%02X\n", ptr[0], ptr[1], ptr[2]);
 	return; /* no further decode for vendor-specific protocol */
       }
       ptr += 3;
@@ -821,9 +858,9 @@ static void decodeLinkLayer(SFSample *sample)
 
 static void decode80211MAC(SFSample *sample)
 {
-  u_char *start = (u_char *)sample->header;
-  u_char *end = start + sample->headerLen;
-  u_char *ptr = start;
+  uint8_t *start = (uint8_t *)sample->header;
+  uint8_t *end = start + sample->headerLen;
+  uint8_t *ptr = start;
 
   /* assume not found */
   sample->gotIPV4 = NO;
@@ -831,7 +868,7 @@ static void decode80211MAC(SFSample *sample)
 
   if(sample->headerLen < WIFI_MIN_HDR_SIZ) return; /* not enough for an 80211 MAC header */
 
-  uint32_t fc = (ptr[1] << 8) + ptr[0];  // [b7..b0][b15..b8]
+  uint32_t fc = (ptr[1] << 8) + ptr[0];  /* [b7..b0][b15..b8] */
   uint32_t protocolVersion = fc & 3;
   uint32_t control = (fc >> 2) & 3;
   uint32_t subType = (fc >> 4) & 15;
@@ -846,62 +883,62 @@ static void decode80211MAC(SFSample *sample)
 
   ptr += 2;
 
-  uint32_t duration_id = (ptr[1] << 8) + ptr[0]; // not in network byte order either?
+  uint32_t duration_id = (ptr[1] << 8) + ptr[0]; /* not in network byte order either? */
   ptr += 2;
 
   switch(control) {
-  case 0: // mgmt
-  case 1: // ctrl
-  case 3: // rsvd
+  case 0: /* mgmt */
+  case 1: /* ctrl */
+  case 3: /* rsvd */
   break;
 
-  case 2: // data
+  case 2: /* data */
     {
       
-      u_char *macAddr1 = ptr;
+      uint8_t *macAddr1 = ptr;
       ptr += 6;
-      u_char *macAddr2 = ptr;
+      uint8_t *macAddr2 = ptr;
       ptr += 6;
-      u_char *macAddr3 = ptr;
+      uint8_t *macAddr3 = ptr;
       ptr += 6;
       uint32_t sequence = (ptr[0] << 8) + ptr[1];
       ptr += 2;
 
-      // ToDS   FromDS   Addr1   Addr2  Addr3   Addr4
-      // 0      0        DA      SA     BSSID   N/A (ad-hoc)
-      // 0      1        DA      BSSID  SA      N/A
-      // 1      0        BSSID   SA     DA      N/A
-      // 1      1        RA      TA     DA      SA  (wireless bridge)
+      /* ToDS   FromDS   Addr1   Addr2  Addr3   Addr4
+         0      0        DA      SA     BSSID   N/A (ad-hoc)
+         0      1        DA      BSSID  SA      N/A
+         1      0        BSSID   SA     DA      N/A
+         1      1        RA      TA     DA      SA  (wireless bridge) */
 
-      u_char *rxMAC = macAddr1;
-      u_char *txMAC = macAddr2;
-      u_char *srcMAC = NULL;
-      u_char *dstMAC = NULL;
+      uint8_t *rxMAC = macAddr1;
+      uint8_t *txMAC = macAddr2;
+      uint8_t *srcMAC = NULL;
+      uint8_t *dstMAC = NULL;
 
       if(toDS) {
 	dstMAC = macAddr3;
 	if(fromDS) {
-	  srcMAC = ptr; // macAddr4.  1,1 => (wireless bridge)
+	  srcMAC = ptr; /* macAddr4.  1,1 => (wireless bridge) */
 	  ptr += 6;
 	}
-	else srcMAC = macAddr2;  // 1,0
+	else srcMAC = macAddr2;  /* 1,0 */
       }
       else {
 	dstMAC = macAddr1;
-	if(fromDS) srcMAC = macAddr3; // 0,1
-	else srcMAC = macAddr2; // 0,0
+	if(fromDS) srcMAC = macAddr3; /* 0,1 */
+	else srcMAC = macAddr2; /* 0,0 */
       }
 
       if(srcMAC) {
-	sf_log("srcMAC %02x%02x%02x%02x%02x%02x\n", srcMAC[0], srcMAC[1], srcMAC[2], srcMAC[3], srcMAC[4], srcMAC[5]);
+	sf_log(sample,"srcMAC %02x%02x%02x%02x%02x%02x\n", srcMAC[0], srcMAC[1], srcMAC[2], srcMAC[3], srcMAC[4], srcMAC[5]);
 	memcpy(sample->eth_src, srcMAC, 6);
       }
       if(dstMAC) {
-	sf_log("dstMAC %02x%02x%02x%02x%02x%02x\n", dstMAC[0], dstMAC[1], dstMAC[2], dstMAC[3], dstMAC[4], dstMAC[5]);
+	sf_log(sample,"dstMAC %02x%02x%02x%02x%02x%02x\n", dstMAC[0], dstMAC[1], dstMAC[2], dstMAC[3], dstMAC[4], dstMAC[5]);
 	memcpy(sample->eth_dst, srcMAC, 6);
       }
-      if(txMAC) sf_log("txMAC %02x%02x%02x%02x%02x%02x\n", txMAC[0], txMAC[1], txMAC[2], txMAC[3], txMAC[4], txMAC[5]);
-      if(rxMAC) sf_log("rxMAC %02x%02x%02x%02x%02x%02x\n", rxMAC[0], rxMAC[1], rxMAC[2], rxMAC[3], rxMAC[4], rxMAC[5]);
+      if(txMAC) sf_log(sample,"txMAC %02x%02x%02x%02x%02x%02x\n", txMAC[0], txMAC[1], txMAC[2], txMAC[3], txMAC[4], txMAC[5]);
+      if(rxMAC) sf_log(sample,"rxMAC %02x%02x%02x%02x%02x%02x\n", rxMAC[0], rxMAC[1], rxMAC[2], rxMAC[3], rxMAC[4], rxMAC[5]);
     }
   }
 }
@@ -911,10 +948,10 @@ static void decode80211MAC(SFSample *sample)
   -----------------___________________________------------------
 */
 
-static void decodeIPLayer4(SFSample *sample, u_char *ptr) {
-  u_char *end = sample->header + sample->headerLen;
+static void decodeIPLayer4(SFSample *sample, uint8_t *ptr) {
+  uint8_t *end = sample->header + sample->headerLen;
   if(ptr > (end - 8)) {
-    // not enough header bytes left
+    /* not enough header bytes left */
     return;
   }
   switch(sample->dcd_ipProtocol) {
@@ -922,8 +959,8 @@ static void decodeIPLayer4(SFSample *sample, u_char *ptr) {
     {
       struct myicmphdr icmp;
       memcpy(&icmp, ptr, sizeof(icmp));
-      sf_log("ICMPType %u\n", icmp.type);
-      sf_log("ICMPCode %u\n", icmp.code);
+      sf_log(sample,"ICMPType %u\n", icmp.type);
+      sf_log(sample,"ICMPCode %u\n", icmp.code);
       sample->dcd_sport = icmp.type;
       sample->dcd_dport = icmp.code;
       sample->offsetToPayload = ptr + sizeof(icmp) - sample->header;
@@ -937,9 +974,9 @@ static void decodeIPLayer4(SFSample *sample, u_char *ptr) {
       sample->dcd_sport = ntohs(tcp.th_sport);
       sample->dcd_dport = ntohs(tcp.th_dport);
       sample->dcd_tcpFlags = tcp.th_flags;
-      sf_log("TCPSrcPort %u\n", sample->dcd_sport);
-      sf_log("TCPDstPort %u\n",sample->dcd_dport);
-      sf_log("TCPFlags %u\n", sample->dcd_tcpFlags);
+      sf_log(sample,"TCPSrcPort %u\n", sample->dcd_sport);
+      sf_log(sample,"TCPDstPort %u\n",sample->dcd_dport);
+      sf_log(sample,"TCPFlags %u\n", sample->dcd_tcpFlags);
       headerBytes = (tcp.th_off_and_unused >> 4) * 4;
       ptr += headerBytes;
       sample->offsetToPayload = ptr - sample->header;
@@ -952,9 +989,9 @@ static void decodeIPLayer4(SFSample *sample, u_char *ptr) {
       sample->dcd_sport = ntohs(udp.uh_sport);
       sample->dcd_dport = ntohs(udp.uh_dport);
       sample->udp_pduLen = ntohs(udp.uh_ulen);
-      sf_log("UDPSrcPort %u\n", sample->dcd_sport);
-      sf_log("UDPDstPort %u\n", sample->dcd_dport);
-      sf_log("UDPBytes %u\n", sample->udp_pduLen);
+      sf_log(sample,"UDPSrcPort %u\n", sample->dcd_sport);
+      sf_log(sample,"UDPDstPort %u\n", sample->dcd_dport);
+      sf_log(sample,"UDPBytes %u\n", sample->udp_pduLen);
       sample->offsetToPayload = ptr + sizeof(udp) - sample->header;
     }
     break;
@@ -973,7 +1010,7 @@ static void decodeIPV4(SFSample *sample)
 {
   if(sample->gotIPV4) {
     char buf[51];
-    u_char *ptr = sample->header + sample->offsetToIPV4;
+    uint8_t *ptr = sample->header + sample->offsetToIPV4;
     /* Create a local copy of the IP header (cannot overlay structure in case it is not quad-aligned...some
        platforms would core-dump if we tried that).  It's OK coz this probably performs just as well anyway. */
     struct myiphdr ip;
@@ -986,17 +1023,17 @@ static void decodeIPV4(SFSample *sample)
     sample->dcd_ipProtocol = ip.protocol;
     sample->dcd_ipTos = ip.tos;
     sample->dcd_ipTTL = ip.ttl;
-    sf_log("ip.tot_len %d\n", ntohs(ip.tot_len));
+    sf_log(sample,"ip.tot_len %d\n", ntohs(ip.tot_len));
     /* Log out the decoded IP fields */
-    sf_log("srcIP %s\n", printAddress(&sample->ipsrc, buf, 50));
-    sf_log("dstIP %s\n", printAddress(&sample->ipdst, buf, 50));
-    sf_log("IPProtocol %u\n", sample->dcd_ipProtocol);
-    sf_log("IPTOS %u\n", sample->dcd_ipTos);
-    sf_log("IPTTL %u\n", sample->dcd_ipTTL);
+    sf_log(sample,"srcIP %s\n", printAddress(&sample->ipsrc, buf));
+    sf_log(sample,"dstIP %s\n", printAddress(&sample->ipdst, buf));
+    sf_log(sample,"IPProtocol %u\n", sample->dcd_ipProtocol);
+    sf_log(sample,"IPTOS %u\n", sample->dcd_ipTos);
+    sf_log(sample,"IPTTL %u\n", sample->dcd_ipTTL);
     /* check for fragments */
     sample->ip_fragmentOffset = ntohs(ip.frag_off) & 0x1FFF;
     if(sample->ip_fragmentOffset > 0) {
-      sf_log("IPFragmentOffset %u\n", sample->ip_fragmentOffset);
+      sf_log(sample,"IPFragmentOffset %u\n", sample->ip_fragmentOffset);
     }
     else {
       /* advance the pointer to the next protocol layer */
@@ -1017,77 +1054,77 @@ static void decodeIPV6(SFSample *sample)
   uint16_t payloadLen;
   uint32_t label;
   uint32_t nextHeader;
-  u_char *end = sample->header + sample->headerLen;
+  uint8_t *end = sample->header + sample->headerLen;
 
   if(sample->gotIPV6) {
-    u_char *ptr = sample->header + sample->offsetToIPV6;
+    uint8_t *ptr = sample->header + sample->offsetToIPV6;
     
-    // check the version
+    /* check the version */
     {
       int ipVersion = (*ptr >> 4);
       if(ipVersion != 6) {
-	sf_log("header decode error: unexpected IP version: %d\n", ipVersion);
+	sf_log(sample,"header decode error: unexpected IP version: %d\n", ipVersion);
 	return;
       }
     }
 
-    // get the tos (priority)
+    /* get the tos (priority) */
     sample->dcd_ipTos = *ptr++ & 15;
-    sf_log("IPTOS %u\n", sample->dcd_ipTos);
-    // 24-bit label
+    sf_log(sample,"IPTOS %u\n", sample->dcd_ipTos);
+    /* 24-bit label */
     label = *ptr++;
     label <<= 8;
     label += *ptr++;
     label <<= 8;
     label += *ptr++;
-    sf_log("IP6_label 0x%lx\n", label);
-    // payload
+    sf_log(sample,"IP6_label 0x%lx\n", label);
+    /* payload */
     payloadLen = (ptr[0] << 8) + ptr[1];
     ptr += 2;
-    // if payload is zero, that implies a jumbo payload
-    if(payloadLen == 0) sf_log("IPV6_payloadLen <jumbo>\n");
-    else sf_log("IPV6_payloadLen %u\n", payloadLen);
+    /* if payload is zero, that implies a jumbo payload */
+    if(payloadLen == 0) sf_log(sample,"IPV6_payloadLen <jumbo>\n");
+    else sf_log(sample,"IPV6_payloadLen %u\n", payloadLen);
 
-    // next header
+    /* next header */
     nextHeader = *ptr++;
 
-    // TTL
+    /* TTL */
     sample->dcd_ipTTL = *ptr++;
-    sf_log("IPTTL %u\n", sample->dcd_ipTTL);
+    sf_log(sample,"IPTTL %u\n", sample->dcd_ipTTL);
 
-    {// src and dst address
+    {/* src and dst address */
       char buf[101];
       sample->ipsrc.type = SFLADDRESSTYPE_IP_V6;
       memcpy(&sample->ipsrc.address, ptr, 16);
       ptr +=16;
-      sf_log("srcIP6 %s\n", printAddress(&sample->ipsrc, buf, 100));
+      sf_log(sample,"srcIP6 %s\n", printAddress(&sample->ipsrc, buf));
       sample->ipdst.type = SFLADDRESSTYPE_IP_V6;
       memcpy(&sample->ipdst.address, ptr, 16);
       ptr +=16;
-      sf_log("dstIP6 %s\n", printAddress(&sample->ipdst, buf, 100));
+      sf_log(sample,"dstIP6 %s\n", printAddress(&sample->ipdst, buf));
     }
 
-    // skip over some common header extensions...
-    // http://searchnetworking.techtarget.com/originalContent/0,289142,sid7_gci870277,00.html
-    while(nextHeader == 0 ||  // hop
-	  nextHeader == 43 || // routing
-	  nextHeader == 44 || // fragment
-	  // nextHeader == 50 || // encryption - don't bother coz we'll not be able to read any further
-	  nextHeader == 51 || // auth
-	  nextHeader == 60) { // destination options
+    /* skip over some common header extensions...
+       http://searchnetworking.techtarget.com/originalContent/0,289142,sid7_gci870277,00.html */
+    while(nextHeader == 0 ||  /* hop */
+	  nextHeader == 43 || /* routing */
+	  nextHeader == 44 || /* fragment */
+	  /* nextHeader == 50 => encryption - don't bother coz we'll not be able to read any further */
+	  nextHeader == 51 || /* auth */
+	  nextHeader == 60) { /* destination options */
       uint32_t optionLen, skip;
-      sf_log("IP6HeaderExtension: %d\n", nextHeader);
+      sf_log(sample,"IP6HeaderExtension: %d\n", nextHeader);
       nextHeader = ptr[0];
-      optionLen = 8 * (ptr[1] + 1);  // second byte gives option len in 8-byte chunks, not counting first 8
+      optionLen = 8 * (ptr[1] + 1);  /* second byte gives option len in 8-byte chunks, not counting first 8 */
       skip = optionLen - 2;
       ptr += skip;
-      if(ptr > end) return; // ran off the end of the header
+      if(ptr > end) return; /* ran off the end of the header */
     }
     
-    // now that we have eliminated the extension headers, nextHeader should have what we want to
-    // remember as the ip protocol...
+    /* now that we have eliminated the extension headers, nextHeader should have what we want to
+       remember as the ip protocol... */
     sample->dcd_ipProtocol = nextHeader;
-    sf_log("IPProtocol %u\n", sample->dcd_ipProtocol);
+    sf_log(sample,"IPProtocol %u\n", sample->dcd_ipProtocol);
     decodeIPLayer4(sample, ptr);
   }
 }
@@ -1140,6 +1177,7 @@ static void readPcapHeader() {
 */
 
 #define DLT_EN10MB	1	  /* from libpcap-0.5: net/bpf.h */
+#define DLT_LINUX_SLL   113       /* Linux "cooked" encapsulation */
 #define PCAP_VERSION_MAJOR 2      /* from libpcap-0.5: pcap.h */
 #define PCAP_VERSION_MINOR 4      /* from libpcap-0.5: pcap.h */
 
@@ -1174,12 +1212,12 @@ static void writePcapPacket(SFSample *sample) {
   hdr.len = sample->sampledPacketSize;
   hdr.caplen = sample->headerLen;
   if(sfConfig.removeContent && sample->offsetToPayload) {
-    // shorten the captured header to ensure no payload bytes are included
+    /* shorten the captured header to ensure no payload bytes are included */
     hdr.caplen = sample->offsetToPayload;
   }
 
-  // prepare the whole thing in a buffer first, in case we are piping the output
-  // to another process and the reader expects it all to appear at once...
+  /* prepare the whole thing in a buffer first, in case we are piping the output
+     to another process and the reader expects it all to appear at once... */
   memcpy(buf, &hdr, sizeof(hdr));
   bytes = sizeof(hdr);
   if(sfConfig.tcpdumpHdrPad > 0) {
@@ -1214,7 +1252,7 @@ static uint16_t in_checksum(uint16_t *addr, int len)
     nleft -= 2;
   }
 
-  if (nleft == 1) sum += *(u_char *)w;
+  if (nleft == 1) sum += *(uint8_t *)w;
 
   sum = (sum >> 16) + (sum & 0xffff);
   sum += (sum >> 16);
@@ -1249,16 +1287,16 @@ static void openNetFlowSocket_spoof()
   memset(&sfConfig.sendPkt, 0, sizeof(sfConfig.sendPkt));
   sfConfig.sendPkt.ip.version_and_headerLen = 0x45;
   sfConfig.sendPkt.ip.protocol = IPPROTO_UDP;
-  sfConfig.sendPkt.ip.ttl = 64; // IPDEFTTL
-  sfConfig.ipid = 12000; // start counting from 12000 (just an arbitrary number)
-  // sfConfig.ip->frag_off = htons(0x4000); // don't fragment
-  // can't set the source address yet, but the dest address is known
+  sfConfig.sendPkt.ip.ttl = 64; /* IPDEFTTL */
+  sfConfig.ipid = 12000; /* start counting from 12000 (just an arbitrary number) */
+  /* sfConfig.ip->frag_off = htons(0x4000); */ /* don't fragment */
+  /* can't set the source address yet, but the dest address is known */
   sfConfig.sendPkt.ip.daddr = sfConfig.netFlowOutputIP.s_addr;
-  // can't do the ip_len and checksum until we know the size of the packet
+  /* can't do the ip_len and checksum until we know the size of the packet */
   sfConfig.sendPkt.udp.uh_dport = htons(sfConfig.netFlowOutputPort);
-  // might as well set the source port to be the same
+  /* might as well set the source port to be the same */
   sfConfig.sendPkt.udp.uh_sport = htons(sfConfig.netFlowOutputPort);
-  // can't do the udp_len or udp_checksum until we know the size of the packet
+  /* can't do the udp_len or udp_checksum until we know the size of the packet */
 }
 
 
@@ -1271,29 +1309,29 @@ static void openNetFlowSocket_spoof()
 static void sendNetFlowDatagram_spoof(SFSample *sample, NFFlowPkt5 *pkt)
 {
   uint16_t packetLen = sizeof(*pkt) + sizeof(struct myiphdr) + sizeof(struct myudphdr);
-  // copy the data into the send packet
+  /* copy the data into the send packet */
   memcpy(sfConfig.sendPkt.data, (char *)pkt, sizeof(*pkt));
-  // increment the ip-id
+  /* increment the ip-id */
   sfConfig.sendPkt.ip.id = htons(++sfConfig.ipid);
-  // set the length fields in the ip and udp headers
+  /* set the length fields in the ip and udp headers */
   sfConfig.sendPkt.ip.tot_len = htons(packetLen);
   sfConfig.sendPkt.udp.uh_ulen = htons(packetLen - sizeof(struct myiphdr));
-  // set the source address to the source address of the input event
+  /* set the source address to the source address of the input event */
   sfConfig.sendPkt.ip.saddr = sample->agent_addr.address.ip_v4.addr;
-  // IP header checksum
+  /* IP header checksum */
   sfConfig.sendPkt.ip.check = in_checksum((uint16_t *)&sfConfig.sendPkt.ip, sizeof(struct myiphdr));
   if (sfConfig.sendPkt.ip.check == 0) sfConfig.sendPkt.ip.check = 0xffff;
-  // UDP Checksum
-  // copy out those parts of the IP header that are supposed to be in the UDP checksum,
-  // and blat them in front of the udp header (after saving what was there before).
-  // Then compute the udp checksum.  Then patch the saved data back again.
+  /* UDP Checksum
+     copy out those parts of the IP header that are supposed to be in the UDP checksum,
+     and blat them in front of the udp header (after saving what was there before).
+     Then compute the udp checksum.  Then patch the saved data back again. */
   {
     char *ptr;
     struct udpmagichdr {
       uint32_t src;
       uint32_t dst;
-      u_char zero;
-      u_char proto;
+      uint8_t zero;
+      uint8_t proto;
       u_short len;
     } h, saved;
     
@@ -1302,22 +1340,22 @@ static void sendNetFlowDatagram_spoof(SFSample *sample, NFFlowPkt5 *pkt)
     h.zero = 0;
     h.proto = IPPROTO_UDP;
     h.len = sfConfig.sendPkt.udp.uh_ulen;
-    // set the pointer to 12 bytes before the start of the udp header
+    /* set the pointer to 12 bytes before the start of the udp header */
     ptr = (char *)&sfConfig.sendPkt.udp;
     ptr -= sizeof(struct udpmagichdr);
-    // save what's there
+    /* save what's there */
     memcpy(&saved, ptr, sizeof(struct udpmagichdr));
-    // blat in the replacement bytes
+    /* blat in the replacement bytes */
     memcpy(ptr, &h, sizeof(struct udpmagichdr));
-    // compute the checksum
+    /* compute the checksum */
     sfConfig.sendPkt.udp.uh_sum = 0;
     sfConfig.sendPkt.udp.uh_sum = in_checksum((uint16_t *)ptr,
 					      ntohs(sfConfig.sendPkt.udp.uh_ulen) + sizeof(struct udpmagichdr));
     if (sfConfig.sendPkt.udp.uh_sum == 0) sfConfig.sendPkt.udp.uh_sum = 0xffff;
-    // copy the save bytes back again
+    /* copy the save bytes back again */
     memcpy(ptr, &saved, sizeof(struct udpmagichdr));
     
-    { // now send the packet
+    { /* now send the packet */
       int bytesSent;
       struct sockaddr dest;
       struct sockaddr_in *to = (struct sockaddr_in *)&dest;
@@ -1357,7 +1395,7 @@ static void openNetFlowSocket()
     addr.sin_port = ntohs(sfConfig.netFlowOutputPort);
     addr.sin_addr.s_addr = sfConfig.netFlowOutputIP.s_addr; 
     
-    // open an ordinary UDP socket
+    /* open an ordinary UDP socket */
     if((sfConfig.netFlowOutputSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
       fprintf(ERROUT, "netflow output socket open failed\n");
       exit(-4);
@@ -1382,13 +1420,13 @@ static void sendNetFlowDatagram(SFSample *sample)
   NFFlowPkt5 pkt;
   uint32_t now = (uint32_t)time(NULL);
   uint32_t bytes;
-  // ignore fragments
+  /* ignore fragments */
   if(sample->ip_fragmentOffset > 0) return;
-  // count the bytes from the start of IP header, with the exception that
-  // for udp packets we use the udp_pduLen. This is because the udp_pduLen
-  // can be up tp 65535 bytes, which causes fragmentation at the IP layer.
-  // Since the sampled fragments are discarded, we have to use this field
-  // to get the total bytes estimates right.
+  /* count the bytes from the start of IP header, with the exception that
+     for udp packets we use the udp_pduLen. This is because the udp_pduLen
+     can be up tp 65535 bytes, which causes fragmentation at the IP layer.
+     Since the sampled fragments are discarded, we have to use this field
+     to get the total bytes estimates right. */
   if(sample->udp_pduLen > 0) bytes = sample->udp_pduLen;
   else bytes = sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4;
   
@@ -1457,9 +1495,9 @@ static void sendNetFlowDatagram(SFSample *sample)
 
 static uint32_t getData32_nobswap(SFSample *sample) {
   uint32_t ans = *(sample->datap)++;
-  // make sure we didn't run off the end of the datagram.  Thanks to 
-  // Sven Eschenberg for spotting a bug/overrun-vulnerabilty that was here before.
-  if((u_char *)sample->datap > sample->endp) {
+  /* make sure we didn't run off the end of the datagram.  Thanks to 
+     Sven Eschenberg for spotting a bug/overrun-vulnerabilty that was here before. */
+  if((uint8_t *)sample->datap > sample->endp) {
     SFABORT(sample, SF_ABORT_EOS);
   }
   return ans;
@@ -1486,53 +1524,53 @@ static uint64_t getData64(SFSample *sample) {
 static void skipBytes(SFSample *sample, uint32_t skip) {
   int quads = (skip + 3) / 4;
   sample->datap += quads;
-  if(skip > sample->rawSampleLen || (u_char *)sample->datap > sample->endp) {
+  if(skip > sample->rawSampleLen || (uint8_t *)sample->datap > sample->endp) {
     SFABORT(sample, SF_ABORT_EOS);
   }
 }
 
 static uint32_t sf_log_next32(SFSample *sample, char *fieldName) {
   uint32_t val = getData32(sample);
-  sf_log("%s %u\n", fieldName, val);
+  sf_log(sample,"%s %u\n", fieldName, val);
   return val;
 }
 
 static uint64_t sf_log_next64(SFSample *sample, char *fieldName) {
   uint64_t val64 = getData64(sample);
-  sf_log("%s %"PRIu64"\n", fieldName, val64);
+  sf_log(sample,"%s %"PRIu64"\n", fieldName, val64);
   return val64;
 }
 
 void sf_log_percentage(SFSample *sample, char *fieldName)
 {
   uint32_t hundredths = getData32(sample);
-  if(hundredths == (uint32_t)-1) sf_log("%s unknown\n", fieldName);
+  if(hundredths == (uint32_t)-1) sf_log(sample,"%s unknown\n", fieldName);
   else {
     float percent = (float)hundredths / (float)100.0;
-    sf_log("%s %.2f\n", fieldName, percent);
+    sf_log(sample,"%s %.2f\n", fieldName, percent);
   }
 }
 
 static float sf_log_nextFloat(SFSample *sample, char *fieldName) {
   float val = getFloat(sample);
-  sf_log("%s %.3f\n", fieldName, val);
+  sf_log(sample,"%s %.3f\n", fieldName, val);
   return val;
 }
 
 void sf_log_nextMAC(SFSample *sample, char *fieldName)
 {
-  u_char *mac = (u_char *)sample->datap;
-  sf_log("%s %02x%02x%02x%02x%02x%02x\n", fieldName, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  uint8_t *mac = (uint8_t *)sample->datap;
+  sf_log(sample,"%s %02x%02x%02x%02x%02x%02x\n", fieldName, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   skipBytes(sample, 6);
 }
 
 static uint32_t getString(SFSample *sample, char *buf, uint32_t bufLen) {
   uint32_t len, read_len;
   len = getData32(sample);
-  // truncate if too long
+  /* truncate if too long */
   read_len = (len >= bufLen) ? (bufLen - 1) : len;
   memcpy(buf, sample->datap, read_len);
-  buf[read_len] = '\0';   // null terminate
+  buf[read_len] = '\0';   /* null terminate */
   skipBytes(sample, len);
   return len;
 }
@@ -1548,15 +1586,15 @@ static uint32_t getAddress(SFSample *sample, SFLAddress *address) {
   return address->type;
 }
 
-static char *printTag(uint32_t tag, char *buf, int bufLen) {
-  // should really be: snprintf(buf, buflen,...) but snprintf() is not always available
+static char *printTag(uint32_t tag, char *buf) {
+  /* should really be: snprintf(buf, buflen,...) but snprintf() is not always available */
   sprintf(buf, "%u:%u", (tag >> 12), (tag & 0x00000FFF));
   return buf;
 }
 
 static void skipTLVRecord(SFSample *sample, uint32_t tag, uint32_t len, char *description) {
   char buf[51];
-  sf_log("skipping unknown %s: %s len=%d\n", description, printTag(tag, buf, 50), len);
+  sf_log(sample,"skipping unknown %s: %s len=%d\n", description, printTag(tag, buf), len);
   skipBytes(sample, len);
 }
 
@@ -1567,7 +1605,7 @@ static void skipTLVRecord(SFSample *sample, uint32_t tag, uint32_t len, char *de
 
 static void readExtendedSwitch(SFSample *sample)
 {
-  sf_log("extendedType SWITCH\n");
+  sf_log(sample,"extendedType SWITCH\n");
   sample->in_vlan = getData32(sample);
   sample->in_priority = getData32(sample);
   sample->out_vlan = getData32(sample);
@@ -1575,10 +1613,10 @@ static void readExtendedSwitch(SFSample *sample)
 
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_SWITCH;
   
-  sf_log("in_vlan %u\n", sample->in_vlan);
-  sf_log("in_priority %u\n", sample->in_priority);
-  sf_log("out_vlan %u\n", sample->out_vlan);
-  sf_log("out_priority %u\n", sample->out_priority);
+  sf_log(sample,"in_vlan %u\n", sample->in_vlan);
+  sf_log(sample,"in_priority %u\n", sample->in_priority);
+  sf_log(sample,"out_vlan %u\n", sample->out_vlan);
+  sf_log(sample,"out_priority %u\n", sample->out_priority);
 }
 
 /*_________________---------------------------__________________
@@ -1589,16 +1627,16 @@ static void readExtendedSwitch(SFSample *sample)
 static void readExtendedRouter(SFSample *sample)
 {
   char buf[51];
-  sf_log("extendedType ROUTER\n");
+  sf_log(sample,"extendedType ROUTER\n");
   getAddress(sample, &sample->nextHop);
   sample->srcMask = getData32(sample);
   sample->dstMask = getData32(sample);
 
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_ROUTER;
 
-  sf_log("nextHop %s\n", printAddress(&sample->nextHop, buf, 50));
-  sf_log("srcSubnetMask %u\n", sample->srcMask);
-  sf_log("dstSubnetMask %u\n", sample->dstMask);
+  sf_log(sample,"nextHop %s\n", printAddress(&sample->nextHop, buf));
+  sf_log(sample,"srcSubnetMask %u\n", sample->srcMask);
+  sf_log(sample,"dstSubnetMask %u\n", sample->dstMask);
 }
 
 /*_________________---------------------------__________________
@@ -1608,14 +1646,14 @@ static void readExtendedRouter(SFSample *sample)
 
 static void readExtendedGateway_v2(SFSample *sample)
 {
-  sf_log("extendedType GATEWAY\n");
+  sf_log(sample,"extendedType GATEWAY\n");
 
   sample->my_as = getData32(sample);
   sample->src_as = getData32(sample);
   sample->src_peer_as = getData32(sample);
 
-  // clear dst_peer_as and dst_as to make sure we are not
-  // remembering values from a previous sample - (thanks Marc Lavine)
+  /* clear dst_peer_as and dst_as to make sure we are not
+     remembering values from a previous sample - (thanks Marc Lavine) */
   sample->dst_peer_as = 0;
   sample->dst_as = 0;
 
@@ -1625,27 +1663,27 @@ static void readExtendedGateway_v2(SFSample *sample)
     sample->dst_as_path = sample->datap;
     /* and skip over it in the input */
     skipBytes(sample, sample->dst_as_path_len * 4);
-    // fill in the dst and dst_peer fields too
+    /* fill in the dst and dst_peer fields too */
     sample->dst_peer_as = ntohl(sample->dst_as_path[0]);
     sample->dst_as = ntohl(sample->dst_as_path[sample->dst_as_path_len - 1]);
   }
   
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_GATEWAY;
   
-  sf_log("my_as %u\n", sample->my_as);
-  sf_log("src_as %u\n", sample->src_as);
-  sf_log("src_peer_as %u\n", sample->src_peer_as);
-  sf_log("dst_as %u\n", sample->dst_as);
-  sf_log("dst_peer_as %u\n", sample->dst_peer_as);
-  sf_log("dst_as_path_len %u\n", sample->dst_as_path_len);
+  sf_log(sample,"my_as %u\n", sample->my_as);
+  sf_log(sample,"src_as %u\n", sample->src_as);
+  sf_log(sample,"src_peer_as %u\n", sample->src_peer_as);
+  sf_log(sample,"dst_as %u\n", sample->dst_as);
+  sf_log(sample,"dst_peer_as %u\n", sample->dst_peer_as);
+  sf_log(sample,"dst_as_path_len %u\n", sample->dst_as_path_len);
   if(sample->dst_as_path_len > 0) {
     uint32_t i = 0;
     for(; i < sample->dst_as_path_len; i++) {
-      if(i == 0) sf_log("dst_as_path ");
-      else sf_log("-");
-      sf_log("%u", ntohl(sample->dst_as_path[i]));
+      if(i == 0) sf_log(sample,"dst_as_path ");
+      else sf_log(sample,"-");
+      sf_log(sample,"%u", ntohl(sample->dst_as_path[i]));
     }
-    sf_log("\n");
+    sf_log(sample,"\n");
   }
 }
 
@@ -1660,28 +1698,28 @@ static void readExtendedGateway(SFSample *sample)
   uint32_t seg;
   char buf[51];
 
-  sf_log("extendedType GATEWAY\n");
+  sf_log(sample,"extendedType GATEWAY\n");
 
   if(sample->datagramVersion >= 5) {
     getAddress(sample, &sample->bgp_nextHop);
-    sf_log("bgp_nexthop %s\n", printAddress(&sample->bgp_nextHop, buf, 50));
+    sf_log(sample,"bgp_nexthop %s\n", printAddress(&sample->bgp_nextHop, buf));
   }
 
   sample->my_as = getData32(sample);
   sample->src_as = getData32(sample);
   sample->src_peer_as = getData32(sample);
-  sf_log("my_as %u\n", sample->my_as);
-  sf_log("src_as %u\n", sample->src_as);
-  sf_log("src_peer_as %u\n", sample->src_peer_as);
+  sf_log(sample,"my_as %u\n", sample->my_as);
+  sf_log(sample,"src_as %u\n", sample->src_as);
+  sf_log(sample,"src_peer_as %u\n", sample->src_peer_as);
   segments = getData32(sample);
 
-  // clear dst_peer_as and dst_as to make sure we are not
-  // remembering values from a previous sample - (thanks Marc Lavine)
+  /* clear dst_peer_as and dst_as to make sure we are not
+     remembering values from a previous sample - (thanks Marc Lavine) */
   sample->dst_peer_as = 0;
   sample->dst_as = 0;
 
   if(segments > 0) {
-    sf_log("dst_as_path ");
+    sf_log(sample,"dst_as_path ");
     for(seg = 0; seg < segments; seg++) {
       uint32_t seg_type;
       uint32_t seg_len;
@@ -1693,19 +1731,19 @@ static void readExtendedGateway(SFSample *sample)
 	asNumber = getData32(sample);
 	/* mark the first one as the dst_peer_as */
 	if(i == 0 && seg == 0) sample->dst_peer_as = asNumber;
-	else sf_log("-");
+	else sf_log(sample,"-");
 	/* make sure the AS sets are in parentheses */
-	if(i == 0 && seg_type == SFLEXTENDED_AS_SET) sf_log("(");
-	sf_log("%u", asNumber);
+	if(i == 0 && seg_type == SFLEXTENDED_AS_SET) sf_log(sample,"(");
+	sf_log(sample,"%u", asNumber);
 	/* mark the last one as the dst_as */
 	if(seg == (segments - 1) && i == (seg_len - 1)) sample->dst_as = asNumber;
       }
-      if(seg_type == SFLEXTENDED_AS_SET) sf_log(")");
+      if(seg_type == SFLEXTENDED_AS_SET) sf_log(sample,")");
     }
-    sf_log("\n");
+    sf_log(sample,"\n");
   }
-  sf_log("dst_as %u\n", sample->dst_as);
-  sf_log("dst_peer_as %u\n", sample->dst_peer_as);
+  sf_log(sample,"dst_as %u\n", sample->dst_as);
+  sf_log(sample,"dst_peer_as %u\n", sample->dst_peer_as);
 
   sample->communities_len = getData32(sample);
   /* just point at the communities array */
@@ -1717,15 +1755,15 @@ static void readExtendedGateway(SFSample *sample)
   if(sample->communities_len > 0) {
     uint32_t j = 0;
     for(; j < sample->communities_len; j++) {
-      if(j == 0) sf_log("BGP_communities ");
-      else sf_log("-");
-      sf_log("%u", ntohl(sample->communities[j]));
+      if(j == 0) sf_log(sample,"BGP_communities ");
+      else sf_log(sample,"-");
+      sf_log(sample,"%u", ntohl(sample->communities[j]));
     }
-    sf_log("\n");
+    sf_log(sample,"\n");
   }
 
   sample->localpref = getData32(sample);
-  sf_log("BGP_localpref %u\n", sample->localpref);
+  sf_log(sample,"BGP_localpref %u\n", sample->localpref);
 
 }
 
@@ -1736,26 +1774,26 @@ static void readExtendedGateway(SFSample *sample)
 
 static void readExtendedUser(SFSample *sample)
 {
-  sf_log("extendedType USER\n");
+  sf_log(sample,"extendedType USER\n");
 
   if(sample->datagramVersion >= 5) {
     sample->src_user_charset = getData32(sample);
-    sf_log("src_user_charset %d\n", sample->src_user_charset);
+    sf_log(sample,"src_user_charset %d\n", sample->src_user_charset);
   }
 
   sample->src_user_len = getString(sample, sample->src_user, SA_MAX_EXTENDED_USER_LEN);
 
   if(sample->datagramVersion >= 5) {
     sample->dst_user_charset = getData32(sample);
-    sf_log("dst_user_charset %d\n", sample->dst_user_charset);
+    sf_log(sample,"dst_user_charset %d\n", sample->dst_user_charset);
   }
 
   sample->dst_user_len = getString(sample, sample->dst_user, SA_MAX_EXTENDED_USER_LEN);
 
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_USER;
   
-  sf_log("src_user %s\n", sample->src_user);
-  sf_log("dst_user %s\n", sample->dst_user);
+  sf_log(sample,"src_user %s\n", sample->src_user);
+  sf_log(sample,"dst_user %s\n", sample->dst_user);
 }
 
 /*_________________---------------------------__________________
@@ -1765,15 +1803,15 @@ static void readExtendedUser(SFSample *sample)
 
 static void readExtendedUrl(SFSample *sample)
 {
-  sf_log("extendedType URL\n");
+  sf_log(sample,"extendedType URL\n");
 
   sample->url_direction = getData32(sample);
-  sf_log("url_direction %u\n", sample->url_direction);
+  sf_log(sample,"url_direction %u\n", sample->url_direction);
   sample->url_len = getString(sample, sample->url, SA_MAX_EXTENDED_URL_LEN);
-  sf_log("url %s\n", sample->url);
+  sf_log(sample,"url %s\n", sample->url);
   if(sample->datagramVersion >= 5) {
     sample->host_len = getString(sample, sample->host, SA_MAX_EXTENDED_HOST_LEN);
-    sf_log("host %s\n", sample->host);
+    sf_log(sample,"host %s\n", sample->host);
   }
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_URL;
 }
@@ -1797,16 +1835,16 @@ static void mplsLabelStack(SFSample *sample, char *fieldName)
   if(lstk.depth > 0) {
     uint32_t j = 0;
     for(; j < lstk.depth; j++) {
-      if(j == 0) sf_log("%s ", fieldName);
-      else sf_log("-");
+      if(j == 0) sf_log(sample,"%s ", fieldName);
+      else sf_log(sample,"-");
       lab = ntohl(lstk.stack[j]);
-      sf_log("%u.%u.%u.%u",
-	     (lab >> 12),     // label
-	     (lab >> 9) & 7,  // experimental
-	     (lab >> 8) & 1,  // bottom of stack
-	     (lab &  255));   // TTL
+      sf_log(sample,"%u.%u.%u.%u",
+	     (lab >> 12),     /* label */
+	     (lab >> 9) & 7,  /* experimental */
+	     (lab >> 8) & 1,  /* bottom of stack */
+	     (lab &  255));   /* TTL */
     }
-    sf_log("\n");
+    sf_log(sample,"\n");
   }
 }
 
@@ -1818,9 +1856,9 @@ static void mplsLabelStack(SFSample *sample, char *fieldName)
 static void readExtendedMpls(SFSample *sample)
 {
   char buf[51];
-  sf_log("extendedType MPLS\n");
+  sf_log(sample,"extendedType MPLS\n");
   getAddress(sample, &sample->mpls_nextHop);
-  sf_log("mpls_nexthop %s\n", printAddress(&sample->mpls_nextHop, buf, 50));
+  sf_log(sample,"mpls_nexthop %s\n", printAddress(&sample->mpls_nextHop, buf));
 
   mplsLabelStack(sample, "mpls_input_stack");
   mplsLabelStack(sample, "mpls_output_stack");
@@ -1836,11 +1874,11 @@ static void readExtendedMpls(SFSample *sample)
 static void readExtendedNat(SFSample *sample)
 {
   char buf[51];
-  sf_log("extendedType NAT\n");
+  sf_log(sample,"extendedType NAT\n");
   getAddress(sample, &sample->nat_src);
-  sf_log("nat_src %s\n", printAddress(&sample->nat_src, buf, 50));
+  sf_log(sample,"nat_src %s\n", printAddress(&sample->nat_src, buf));
   getAddress(sample, &sample->nat_dst);
-  sf_log("nat_dst %s\n", printAddress(&sample->nat_dst, buf, 50));
+  sf_log(sample,"nat_dst %s\n", printAddress(&sample->nat_dst, buf));
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_NAT;
 }
 
@@ -1851,7 +1889,7 @@ static void readExtendedNat(SFSample *sample)
 
 static void readExtendedNatPort(SFSample *sample)
 {
-  sf_log("extendedType NAT PORT\n");
+  sf_log(sample,"extendedType NAT PORT\n");
   sf_log_next32(sample, "nat_src_port");
   sf_log_next32(sample, "nat_dst_port");
 }
@@ -1869,11 +1907,11 @@ static void readExtendedMplsTunnel(SFSample *sample)
   uint32_t tunnel_id, tunnel_cos;
   
   if(getString(sample, tunnel_name, SA_MAX_TUNNELNAME_LEN) > 0)
-    sf_log("mpls_tunnel_lsp_name %s\n", tunnel_name);
+    sf_log(sample,"mpls_tunnel_lsp_name %s\n", tunnel_name);
   tunnel_id = getData32(sample);
-  sf_log("mpls_tunnel_id %u\n", tunnel_id);
+  sf_log(sample,"mpls_tunnel_id %u\n", tunnel_id);
   tunnel_cos = getData32(sample);
-  sf_log("mpls_tunnel_cos %u\n", tunnel_cos);
+  sf_log(sample,"mpls_tunnel_cos %u\n", tunnel_cos);
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_MPLS_TUNNEL;
 }
 
@@ -1888,11 +1926,11 @@ static void readExtendedMplsVC(SFSample *sample)
   char vc_name[SA_MAX_VCNAME_LEN+1];
   uint32_t vll_vc_id, vc_cos;
   if(getString(sample, vc_name, SA_MAX_VCNAME_LEN) > 0)
-    sf_log("mpls_vc_name %s\n", vc_name);
+    sf_log(sample,"mpls_vc_name %s\n", vc_name);
   vll_vc_id = getData32(sample);
-  sf_log("mpls_vll_vc_id %u\n", vll_vc_id);
+  sf_log(sample,"mpls_vll_vc_id %u\n", vll_vc_id);
   vc_cos = getData32(sample);
-  sf_log("mpls_vc_cos %u\n", vc_cos);
+  sf_log(sample,"mpls_vc_cos %u\n", vc_cos);
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_MPLS_VC;
 }
 
@@ -1907,9 +1945,9 @@ static void readExtendedMplsFTN(SFSample *sample)
   char ftn_descr[SA_MAX_FTN_LEN+1];
   uint32_t ftn_mask;
   if(getString(sample, ftn_descr, SA_MAX_FTN_LEN) > 0)
-    sf_log("mpls_ftn_descr %s\n", ftn_descr);
+    sf_log(sample,"mpls_ftn_descr %s\n", ftn_descr);
   ftn_mask = getData32(sample);
-  sf_log("mpls_ftn_mask %u\n", ftn_mask);
+  sf_log(sample,"mpls_ftn_mask %u\n", ftn_mask);
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_MPLS_FTN;
 }
 
@@ -1921,7 +1959,7 @@ static void readExtendedMplsFTN(SFSample *sample)
 static void readExtendedMplsLDP_FEC(SFSample *sample)
 {
   uint32_t fec_addr_prefix_len = getData32(sample);
-  sf_log("mpls_fec_addr_prefix_len %u\n", fec_addr_prefix_len);
+  sf_log(sample,"mpls_fec_addr_prefix_len %u\n", fec_addr_prefix_len);
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_MPLS_LDP_FEC;
 }
 
@@ -1943,16 +1981,16 @@ static void readExtendedVlanTunnel(SFSample *sample)
   if(lstk.depth > 0) {
     uint32_t j = 0;
     for(; j < lstk.depth; j++) {
-      if(j == 0) sf_log("vlan_tunnel ");
-      else sf_log("-");
+      if(j == 0) sf_log(sample,"vlan_tunnel ");
+      else sf_log(sample,"-");
       lab = ntohl(lstk.stack[j]);
-      sf_log("0x%04x.%u.%u.%u",
-	     (lab >> 16),       // TPI
-	     (lab >> 13) & 7,   // priority
-	     (lab >> 12) & 1,   // CFI
-	     (lab & 4095));     // VLAN
+      sf_log(sample,"0x%04x.%u.%u.%u",
+	     (lab >> 16),       /* TPI */
+	     (lab >> 13) & 7,   /* priority */
+	     (lab >> 12) & 1,   /* CFI */
+	     (lab & 4095));     /* VLAN */
     }
-    sf_log("\n");
+    sf_log(sample,"\n");
   }
   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_VLAN_TUNNEL;
 }
@@ -1976,16 +2014,16 @@ static void readExtendedWifiPayload(SFSample *sample)
 static void readExtendedWifiRx(SFSample *sample)
 {
   uint32_t i;
-  u_char *bssid;
+  uint8_t *bssid;
   char ssid[SFL_MAX_SSID_LEN+1];
   if(getString(sample, ssid, SFL_MAX_SSID_LEN) > 0) {
-    sf_log("rx_SSID %s\n", ssid);
+    sf_log(sample,"rx_SSID %s\n", ssid);
   }
 
-  bssid = (u_char *)sample->datap;
-  sf_log("rx_BSSID ");
-  for(i = 0; i < 6; i++) sf_log("%02x", bssid[i]);
-  sf_log("\n");
+  bssid = (uint8_t *)sample->datap;
+  sf_log(sample,"rx_BSSID ");
+  for(i = 0; i < 6; i++) sf_log(sample,"%02x", bssid[i]);
+  sf_log(sample,"\n");
   skipBytes(sample, 6);
 
   sf_log_next32(sample, "rx_version");
@@ -2004,16 +2042,16 @@ static void readExtendedWifiRx(SFSample *sample)
 static void readExtendedWifiTx(SFSample *sample)
 {
   uint32_t i;
-  u_char *bssid;
+  uint8_t *bssid;
   char ssid[SFL_MAX_SSID_LEN+1];
   if(getString(sample, ssid, SFL_MAX_SSID_LEN) > 0) {
-    sf_log("tx_SSID %s\n", ssid);
+    sf_log(sample,"tx_SSID %s\n", ssid);
   }
 
-  bssid = (u_char *)sample->datap;
-  sf_log("tx_BSSID ");
-  for(i = 0; i < 6; i++) sf_log("%02x", bssid[i]);
-  sf_log("\n");
+  bssid = (uint8_t *)sample->datap;
+  sf_log(sample,"tx_BSSID ");
+  for(i = 0; i < 6; i++) sf_log(sample,"%02x", bssid[i]);
+  sf_log(sample,"\n");
   skipBytes(sample, 6);
 
   sf_log_next32(sample, "tx_version");
@@ -2030,15 +2068,17 @@ static void readExtendedWifiTx(SFSample *sample)
   -----------------___________________________------------------
 */
 
+#if 0 /* commenting this out until its caller is uncommented too */
 static void readExtendedAggregation(SFSample *sample)
 {
   uint32_t i, num_pdus = getData32(sample);
-  sf_log("aggregation_num_pdus %u\n", num_pdus);
+  sf_log(sample,"aggregation_num_pdus %u\n", num_pdus);
   for(i = 0; i < num_pdus; i++) {
-    sf_log("aggregation_pdu %u\n", i);
-    readFlowSample(sample, NO); // not sure if this the right one here $$$
+    sf_log(sample,"aggregation_pdu %u\n", i);
+    readFlowSample(sample, NO); /* not sure if this the right one here */
   }
 }
+#endif
 
 /*_________________---------------------------__________________
   _________________  readFlowSample_header    __________________
@@ -2047,25 +2087,25 @@ static void readExtendedAggregation(SFSample *sample)
 
 static void readFlowSample_header(SFSample *sample)
 {
-  sf_log("flowSampleType HEADER\n");
+  sf_log(sample,"flowSampleType HEADER\n");
   sample->headerProtocol = getData32(sample);
-  sf_log("headerProtocol %u\n", sample->headerProtocol);
+  sf_log(sample,"headerProtocol %u\n", sample->headerProtocol);
   sample->sampledPacketSize = getData32(sample);
-  sf_log("sampledPacketSize %u\n", sample->sampledPacketSize);
+  sf_log(sample,"sampledPacketSize %u\n", sample->sampledPacketSize);
   if(sample->datagramVersion > 4) {
-    // stripped count introduced in sFlow version 5
+    /* stripped count introduced in sFlow version 5 */
     sample->stripped = getData32(sample);
-    sf_log("strippedBytes %u\n", sample->stripped);
+    sf_log(sample,"strippedBytes %u\n", sample->stripped);
   }
   sample->headerLen = getData32(sample);
-  sf_log("headerLen %u\n", sample->headerLen);
+  sf_log(sample,"headerLen %u\n", sample->headerLen);
   
-  sample->header = (u_char *)sample->datap; /* just point at the header */
+  sample->header = (uint8_t *)sample->datap; /* just point at the header */
   skipBytes(sample, sample->headerLen);
   {
     char scratch[2000];
-    printHex(sample->header, sample->headerLen, (u_char *)scratch, 2000, 0, 2000);
-    sf_log("headerBytes %s\n", scratch);
+    printHex(sample->header, sample->headerLen, (uint8_t *)scratch, 2000, 0, 2000);
+    sf_log(sample,"headerBytes %s\n", scratch);
   }
   
   switch(sample->headerProtocol) {
@@ -2097,7 +2137,7 @@ static void readFlowSample_header(SFSample *sample)
   case SFLHEADER_POS:
   case SFLHEADER_IEEE80211_AMPDU:
   case SFLHEADER_IEEE80211_AMSDU_SUBFRAME:
-    sf_log("NO_DECODE headerProtocol=%d\n", sample->headerProtocol);
+    sf_log(sample,"NO_DECODE headerProtocol=%d\n", sample->headerProtocol);
     break;
   default:
     fprintf(ERROUT, "undefined headerProtocol = %d\n", sample->headerProtocol);
@@ -2105,13 +2145,13 @@ static void readFlowSample_header(SFSample *sample)
   }
   
   if(sample->gotIPV4) {
-    // report the size of the original IPPdu (including the IP header)
-    sf_log("IPSize %d\n",  sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4);
+    /* report the size of the original IPPdu (including the IP header) */
+    sf_log(sample,"IPSize %d\n",  sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4);
     decodeIPV4(sample);
   }
   else if(sample->gotIPV6) {
-    // report the size of the original IPPdu (including the IP header)
-    sf_log("IPSize %d\n",  sample->sampledPacketSize - sample->stripped - sample->offsetToIPV6);
+    /* report the size of the original IPPdu (including the IP header) */
+    sf_log(sample,"IPSize %d\n",  sample->sampledPacketSize - sample->stripped - sample->offsetToIPV6);
     decodeIPV6(sample);
   }
 
@@ -2124,20 +2164,20 @@ static void readFlowSample_header(SFSample *sample)
 
 static void readFlowSample_ethernet(SFSample *sample, char *prefix)
 {
-  u_char *p;
-  sf_log("flowSampleType %sETHERNET\n", prefix);
+  uint8_t *p;
+  sf_log(sample,"flowSampleType %sETHERNET\n", prefix);
   sample->eth_len = getData32(sample);
   memcpy(sample->eth_src, sample->datap, 6);
   skipBytes(sample, 6);
   memcpy(sample->eth_dst, sample->datap, 6);
   skipBytes(sample, 6);
   sample->eth_type = getData32(sample);
-  sf_log("%sethernet_type %u\n", prefix, sample->eth_type);
-  sf_log("%sethernet_len %u\n", prefix, sample->eth_len);
+  sf_log(sample,"%sethernet_type %u\n", prefix, sample->eth_type);
+  sf_log(sample,"%sethernet_len %u\n", prefix, sample->eth_len);
   p = sample->eth_src;
-  sf_log("%sethernet_src %02x%02x%02x%02x%02x%02x\n", prefix, p[0], p[1], p[2], p[3], p[4], p[5]);
+  sf_log(sample,"%sethernet_src %02x%02x%02x%02x%02x%02x\n", prefix, p[0], p[1], p[2], p[3], p[4], p[5]);
   p = sample->eth_dst;
-  sf_log("%sethernet_dst %02x%02x%02x%02x%02x%02x\n", prefix, p[0], p[1], p[2], p[3], p[4], p[5]);
+  sf_log(sample,"%sethernet_dst %02x%02x%02x%02x%02x%02x\n", prefix, p[0], p[1], p[2], p[3], p[4], p[5]);
 }
 
 
@@ -2148,32 +2188,32 @@ static void readFlowSample_ethernet(SFSample *sample, char *prefix)
 
 static void readFlowSample_IPv4(SFSample *sample, char *prefix)
 {
-  sf_log("flowSampleType %sIPV4\n", prefix);
+  sf_log(sample,"flowSampleType %sIPV4\n", prefix);
   sample->headerLen = sizeof(SFLSampled_ipv4);
-  sample->header = (u_char *)sample->datap; /* just point at the header */
+  sample->header = (uint8_t *)sample->datap; /* just point at the header */
   skipBytes(sample, sample->headerLen);
   {
     char buf[51];
     SFLSampled_ipv4 nfKey;
     memcpy(&nfKey, sample->header, sizeof(nfKey));
     sample->sampledPacketSize = ntohl(nfKey.length);
-    sf_log("%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize); 
-    sf_log("%sIPSize %u\n", prefix,  sample->sampledPacketSize);
+    sf_log(sample,"%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize); 
+    sf_log(sample,"%sIPSize %u\n", prefix,  sample->sampledPacketSize);
     sample->ipsrc.type = SFLADDRESSTYPE_IP_V4;
     sample->ipsrc.address.ip_v4 = nfKey.src_ip;
     sample->ipdst.type = SFLADDRESSTYPE_IP_V4;
     sample->ipdst.address.ip_v4 = nfKey.dst_ip;
     sample->dcd_ipProtocol = ntohl(nfKey.protocol);
     sample->dcd_ipTos = ntohl(nfKey.tos);
-    sf_log("%ssrcIP %s\n", prefix, printAddress(&sample->ipsrc, buf, 50));
-    sf_log("%sdstIP %s\n", prefix, printAddress(&sample->ipdst, buf, 50));
-    sf_log("%sIPProtocol %u\n", prefix, sample->dcd_ipProtocol);
-    sf_log("%sIPTOS %u\n", prefix, sample->dcd_ipTos);
+    sf_log(sample,"%ssrcIP %s\n", prefix, printAddress(&sample->ipsrc, buf));
+    sf_log(sample,"%sdstIP %s\n", prefix, printAddress(&sample->ipdst, buf));
+    sf_log(sample,"%sIPProtocol %u\n", prefix, sample->dcd_ipProtocol);
+    sf_log(sample,"%sIPTOS %u\n", prefix, sample->dcd_ipTos);
     sample->dcd_sport = ntohl(nfKey.src_port);
     sample->dcd_dport = ntohl(nfKey.dst_port);
     switch(sample->dcd_ipProtocol) {
     case 1: /* ICMP */
-      sf_log("%sICMPType %u\n", prefix, sample->dcd_dport);
+      sf_log(sample,"%sICMPType %u\n", prefix, sample->dcd_dport);
       /* not sure about the dest port being icmp type
 	 - might be that src port is icmp type and dest
 	 port is icmp code.  Still, have seen some
@@ -2182,14 +2222,14 @@ static void readFlowSample_IPv4(SFSample *sample, char *prefix)
 	 assume that the destination port has the type */
       break;
     case 6: /* TCP */
-      sf_log("%sTCPSrcPort %u\n", prefix, sample->dcd_sport);
-      sf_log("%sTCPDstPort %u\n", prefix, sample->dcd_dport);
+      sf_log(sample,"%sTCPSrcPort %u\n", prefix, sample->dcd_sport);
+      sf_log(sample,"%sTCPDstPort %u\n", prefix, sample->dcd_dport);
       sample->dcd_tcpFlags = ntohl(nfKey.tcp_flags);
-      sf_log("%sTCPFlags %u\n", prefix, sample->dcd_tcpFlags);
+      sf_log(sample,"%sTCPFlags %u\n", prefix, sample->dcd_tcpFlags);
       break;
     case 17: /* UDP */
-      sf_log("%sUDPSrcPort %u\n", prefix, sample->dcd_sport);
-      sf_log("%sUDPDstPort %u\n", prefix, sample->dcd_dport);
+      sf_log(sample,"%sUDPSrcPort %u\n", prefix, sample->dcd_sport);
+      sf_log(sample,"%sUDPDstPort %u\n", prefix, sample->dcd_dport);
       break;
     default: /* some other protcol */
       break;
@@ -2204,8 +2244,8 @@ static void readFlowSample_IPv4(SFSample *sample, char *prefix)
 
 static void readFlowSample_IPv6(SFSample *sample, char *prefix)
 {
-  sf_log("flowSampleType %sIPV6\n", prefix);
-  sample->header = (u_char *)sample->datap; /* just point at the header */
+  sf_log(sample,"flowSampleType %sIPV6\n", prefix);
+  sample->header = (uint8_t *)sample->datap; /* just point at the header */
   sample->headerLen = sizeof(SFLSampled_ipv6);
   skipBytes(sample, sample->headerLen);
   {
@@ -2213,22 +2253,22 @@ static void readFlowSample_IPv6(SFSample *sample, char *prefix)
     SFLSampled_ipv6 nfKey6;
     memcpy(&nfKey6, sample->header, sizeof(nfKey6));
     sample->sampledPacketSize = ntohl(nfKey6.length);
-    sf_log("%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize); 
-    sf_log("%sIPSize %u\n", prefix, sample->sampledPacketSize); 
+    sf_log(sample,"%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize); 
+    sf_log(sample,"%sIPSize %u\n", prefix, sample->sampledPacketSize); 
     sample->ipsrc.type = SFLADDRESSTYPE_IP_V6;
     memcpy(&sample->ipsrc.address.ip_v6, &nfKey6.src_ip, 16);
     sample->ipdst.type = SFLADDRESSTYPE_IP_V6;
     memcpy(&sample->ipdst.address.ip_v6, &nfKey6.dst_ip, 16);
     sample->dcd_ipProtocol = ntohl(nfKey6.protocol);
-    sf_log("%ssrcIP6 %s\n", prefix, printAddress(&sample->ipsrc, buf, 50));
-    sf_log("%sdstIP6 %s\n", prefix, printAddress(&sample->ipdst, buf, 50));
-    sf_log("%sIPProtocol %u\n", prefix, sample->dcd_ipProtocol);
-    sf_log("%spriority %u\n", prefix, ntohl(nfKey6.priority));
+    sf_log(sample,"%ssrcIP6 %s\n", prefix, printAddress(&sample->ipsrc, buf));
+    sf_log(sample,"%sdstIP6 %s\n", prefix, printAddress(&sample->ipdst, buf));
+    sf_log(sample,"%sIPProtocol %u\n", prefix, sample->dcd_ipProtocol);
+    sf_log(sample,"%spriority %u\n", prefix, ntohl(nfKey6.priority));
     sample->dcd_sport = ntohl(nfKey6.src_port);
     sample->dcd_dport = ntohl(nfKey6.dst_port);
     switch(sample->dcd_ipProtocol) {
     case 1: /* ICMP */
-      sf_log("%sICMPType %u\n", prefix, sample->dcd_dport);
+      sf_log(sample,"%sICMPType %u\n", prefix, sample->dcd_dport);
       /* not sure about the dest port being icmp type
 	 - might be that src port is icmp type and dest
 	 port is icmp code.  Still, have seen some
@@ -2237,14 +2277,14 @@ static void readFlowSample_IPv6(SFSample *sample, char *prefix)
 	 assume that the destination port has the type */
       break;
     case 6: /* TCP */
-      sf_log("%sTCPSrcPort %u\n", prefix, sample->dcd_sport);
-      sf_log("%sTCPDstPort %u\n", prefix, sample->dcd_dport);
+      sf_log(sample,"%sTCPSrcPort %u\n", prefix, sample->dcd_sport);
+      sf_log(sample,"%sTCPDstPort %u\n", prefix, sample->dcd_dport);
       sample->dcd_tcpFlags = ntohl(nfKey6.tcp_flags);
-      sf_log("%sTCPFlags %u\n", prefix, sample->dcd_tcpFlags);
+      sf_log(sample,"%sTCPFlags %u\n", prefix, sample->dcd_tcpFlags);
       break;
     case 17: /* UDP */
-      sf_log("%sUDPSrcPort %u\n", prefix, sample->dcd_sport);
-      sf_log("%sUDPDstPort %u\n", prefix, sample->dcd_dport);
+      sf_log(sample,"%sUDPSrcPort %u\n", prefix, sample->dcd_sport);
+      sf_log(sample,"%sUDPDstPort %u\n", prefix, sample->dcd_dport);
       break;
     default: /* some other protcol */
       break;
@@ -2262,11 +2302,11 @@ static void readFlowSample_memcache(SFSample *sample)
   char key[SFL_MAX_MEMCACHE_KEY+1];
 #define ENC_KEY_BYTES (SFL_MAX_MEMCACHE_KEY * 3) + 1
   char enc_key[ENC_KEY_BYTES];
-  sf_log("flowSampleType memcache\n");
+  sf_log(sample,"flowSampleType memcache\n");
   sf_log_next32(sample, "memcache_op_protocol");
   sf_log_next32(sample, "memcache_op_cmd");
   if(getString(sample, key, SFL_MAX_MEMCACHE_KEY) > 0) {
-    sf_log("memcache_op_key %s\n", URLEncode(key, enc_key, ENC_KEY_BYTES));
+    sf_log(sample,"memcache_op_key %s\n", URLEncode(key, enc_key, ENC_KEY_BYTES));
   }
   sf_log_next32(sample, "memcache_op_nkeys");
   sf_log_next32(sample, "memcache_op_value_bytes");
@@ -2294,31 +2334,31 @@ static void readFlowSample_http(SFSample *sample, uint32_t tag)
   uint64_t req_bytes;
   uint64_t resp_bytes;
 
-  sf_log("flowSampleType http\n");
+  sf_log(sample,"flowSampleType http\n");
   method = sf_log_next32(sample, "http_method");
   protocol = sf_log_next32(sample, "http_protocol");
   if(getString(sample, uri, SFL_MAX_HTTP_URI) > 0) {
-    sf_log("http_uri %s\n", uri);
+    sf_log(sample,"http_uri %s\n", uri);
   }
   if(getString(sample, host, SFL_MAX_HTTP_HOST) > 0) {
-    sf_log("http_host %s\n", host);
+    sf_log(sample,"http_host %s\n", host);
   }
   if(getString(sample, referrer, SFL_MAX_HTTP_REFERRER) > 0) {
-    sf_log("http_referrer %s\n", referrer);
+    sf_log(sample,"http_referrer %s\n", referrer);
   }
   if(getString(sample, useragent, SFL_MAX_HTTP_USERAGENT) > 0) {
-    sf_log("http_useragent %s\n", useragent);
+    sf_log(sample,"http_useragent %s\n", useragent);
   }
   if(tag == SFLFLOW_HTTP2) {
     if(getString(sample, xff, SFL_MAX_HTTP_XFF) > 0) {
-      sf_log("http_xff %s\n", xff);
+      sf_log(sample,"http_xff %s\n", xff);
     }
   }
   if(getString(sample, authuser, SFL_MAX_HTTP_AUTHUSER) > 0) {
-    sf_log("http_authuser %s\n", authuser);
+    sf_log(sample,"http_authuser %s\n", authuser);
   }
   if(getString(sample, mimetype, SFL_MAX_HTTP_MIMETYPE) > 0) {
-    sf_log("http_mimetype %s\n", mimetype);
+    sf_log(sample,"http_mimetype %s\n", mimetype);
   }
   if(tag == SFLFLOW_HTTP2) {
     req_bytes = sf_log_next64(sample, "http_request_bytes");
@@ -2330,8 +2370,12 @@ static void readFlowSample_http(SFSample *sample, uint32_t tag)
   if(sfConfig.outputFormat == SFLFMT_CLF) {
     time_t now = time(NULL);
     char nowstr[200];
-    strftime(nowstr, 200, "%d/%b/%Y:%H:%M:%S %z", localtime(&now));
-    snprintf(sfCLF.http_log, SFLFMT_CLF_MAX_LINE, "- %s [%s] \"%s %s HTTP/%u.%u\" %u %"PRIu64" \"%s\" \"%s\"",
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat"
+    strftime(nowstr, 200, "%d/%b/%Y:%H:%M:%S %z", localtime(&now)); /* there seems to be no simple portable equivalent to %z */
+#pragma GCC diagnostic pop
+    /* should really be: snprintf(sfCLF.http_log, SFLFMT_CLF_MAX_LINE,...) but snprintf() is not always available */
+    sprintf(sfCLF.http_log, "- %s [%s] \"%s %s HTTP/%u.%u\" %u %"PRIu64" \"%s\" \"%s\"",
 	     authuser[0] ? authuser : "-",
 	     nowstr,
 	     SFHTTP_method_names[method],
@@ -2358,23 +2402,23 @@ static void readFlowSample_APP(SFSample *sample)
   char attributes[SFLAPP_MAX_ATTRIBUTES_LEN];
   char status[SFLAPP_MAX_STATUS_LEN];
 
-  sf_log("flowSampleType applicationOperation\n");
+  sf_log(sample,"flowSampleType applicationOperation\n");
 
   if(getString(sample, application, SFLAPP_MAX_APPLICATION_LEN) > 0) {
-    sf_log("application %s\n", application);
+    sf_log(sample,"application %s\n", application);
   }
   if(getString(sample, operation, SFLAPP_MAX_OPERATION_LEN) > 0) {
-    sf_log("operation %s\n", operation);
+    sf_log(sample,"operation %s\n", operation);
   }
   if(getString(sample, attributes, SFLAPP_MAX_ATTRIBUTES_LEN) > 0) {
-    sf_log("attributes %s\n", attributes);
+    sf_log(sample,"attributes %s\n", attributes);
   }
   if(getString(sample, status, SFLAPP_MAX_STATUS_LEN) > 0) {
-    sf_log("status_descr %s\n", status);
+    sf_log(sample,"status_descr %s\n", status);
   }
   sf_log_next64(sample, "request_bytes");
   sf_log_next64(sample, "response_bytes");
-  sf_log("status %s\n", SFL_APP_STATUS_names[getData32(sample)]);
+  sf_log(sample,"status %s\n", SFL_APP_STATUS_names[getData32(sample)]);
   sf_log_next32(sample, "duration_uS");
 }
 
@@ -2390,13 +2434,13 @@ static void readFlowSample_APP_CTXT(SFSample *sample)
   char operation[SFLAPP_MAX_OPERATION_LEN];
   char attributes[SFLAPP_MAX_ATTRIBUTES_LEN];
   if(getString(sample, application, SFLAPP_MAX_APPLICATION_LEN) > 0) {
-    sf_log("server_context_application %s\n", application);
+    sf_log(sample,"server_context_application %s\n", application);
   }
   if(getString(sample, operation, SFLAPP_MAX_OPERATION_LEN) > 0) {
-    sf_log("server_context_operation %s\n", operation);
+    sf_log(sample,"server_context_operation %s\n", operation);
   }
   if(getString(sample, attributes, SFLAPP_MAX_ATTRIBUTES_LEN) > 0) {
-    sf_log("server_context_attributes %s\n", attributes);
+    sf_log(sample,"server_context_attributes %s\n", attributes);
   }
 }
 
@@ -2409,7 +2453,7 @@ static void readFlowSample_APP_ACTOR_INIT(SFSample *sample)
 {
   char actor[SFLAPP_MAX_ACTOR_LEN];
   if(getString(sample, actor, SFLAPP_MAX_ACTOR_LEN) > 0) {
-    sf_log("actor_initiator %s\n", actor);
+    sf_log(sample,"actor_initiator %s\n", actor);
   }
 }
 
@@ -2422,7 +2466,7 @@ static void readFlowSample_APP_ACTOR_TGT(SFSample *sample)
 {
   char actor[SFLAPP_MAX_ACTOR_LEN];
   if(getString(sample, actor, SFLAPP_MAX_ACTOR_LEN) > 0) {
-    sf_log("actor_target %s\n", actor);
+    sf_log(sample,"actor_target %s\n", actor);
   }
 }
 
@@ -2434,14 +2478,14 @@ static void readFlowSample_APP_ACTOR_TGT(SFSample *sample)
 static void readExtendedSocket4(SFSample *sample)
 {
   char buf[51];
-  sf_log("extendedType socket4\n");
+  sf_log(sample,"extendedType socket4\n");
   sf_log_next32(sample, "socket4_ip_protocol");
   sample->ipsrc.type = SFLADDRESSTYPE_IP_V4;
   sample->ipsrc.address.ip_v4.addr = getData32_nobswap(sample);
   sample->ipdst.type = SFLADDRESSTYPE_IP_V4;
   sample->ipdst.address.ip_v4.addr = getData32_nobswap(sample);
-  sf_log("socket4_local_ip %s\n", printAddress(&sample->ipsrc, buf, 50));
-  sf_log("socket4_remote_ip %s\n", printAddress(&sample->ipdst, buf, 50));
+  sf_log(sample,"socket4_local_ip %s\n", printAddress(&sample->ipsrc, buf));
+  sf_log(sample,"socket4_remote_ip %s\n", printAddress(&sample->ipdst, buf));
   sf_log_next32(sample, "socket4_local_port");
   sf_log_next32(sample, "socket4_remote_port");
   
@@ -2461,14 +2505,14 @@ static void readExtendedProxySocket4(SFSample *sample)
 {
   char buf[51];
   SFLAddress ipsrc,ipdst;
-  sf_log("extendedType proxy_socket4\n");
+  sf_log(sample,"extendedType proxy_socket4\n");
   sf_log_next32(sample, "proxy_socket4_ip_protocol");
   ipsrc.type = SFLADDRESSTYPE_IP_V4;
   ipsrc.address.ip_v4.addr = getData32_nobswap(sample);
   ipdst.type = SFLADDRESSTYPE_IP_V4;
   ipdst.address.ip_v4.addr = getData32_nobswap(sample);
-  sf_log("proxy_socket4_local_ip %s\n", printAddress(&ipsrc, buf, 50));
-  sf_log("proxy_socket4_remote_ip %s\n", printAddress(&ipdst, buf, 50));
+  sf_log(sample,"proxy_socket4_local_ip %s\n", printAddress(&ipsrc, buf));
+  sf_log(sample,"proxy_socket4_remote_ip %s\n", printAddress(&ipdst, buf));
   sf_log_next32(sample, "proxy_socket4_local_port");
   sf_log_next32(sample, "proxy_socket4_remote_port");
 }
@@ -2481,7 +2525,7 @@ static void readExtendedProxySocket4(SFSample *sample)
 static void readExtendedSocket6(SFSample *sample)
 {
   char buf[51];
-  sf_log("extendedType socket6\n");
+  sf_log(sample,"extendedType socket6\n");
   sf_log_next32(sample, "socket6_ip_protocol");
   sample->ipsrc.type = SFLADDRESSTYPE_IP_V6;
   memcpy(&sample->ipsrc.address.ip_v6, sample->datap, 16);
@@ -2489,8 +2533,8 @@ static void readExtendedSocket6(SFSample *sample)
   sample->ipdst.type = SFLADDRESSTYPE_IP_V6;
   memcpy(&sample->ipdst.address.ip_v6, sample->datap, 16);
   skipBytes(sample, 16);
-  sf_log("socket6_local_ip %s\n", printAddress(&sample->ipsrc, buf, 50));
-  sf_log("socket6_remote_ip %s\n", printAddress(&sample->ipdst, buf, 50));
+  sf_log(sample,"socket6_local_ip %s\n", printAddress(&sample->ipsrc, buf));
+  sf_log(sample,"socket6_remote_ip %s\n", printAddress(&sample->ipdst, buf));
   sf_log_next32(sample, "socket6_local_port");
   sf_log_next32(sample, "socket6_remote_port");
 
@@ -2509,7 +2553,7 @@ static void readExtendedProxySocket6(SFSample *sample)
 {
   char buf[51];
   SFLAddress ipsrc, ipdst;
-  sf_log("extendedType proxy_socket6\n");
+  sf_log(sample,"extendedType proxy_socket6\n");
   sf_log_next32(sample, "proxy_socket6_ip_protocol");
   ipsrc.type = SFLADDRESSTYPE_IP_V6;
   memcpy(&ipsrc.address.ip_v6, sample->datap, 16);
@@ -2517,8 +2561,8 @@ static void readExtendedProxySocket6(SFSample *sample)
   ipdst.type = SFLADDRESSTYPE_IP_V6;
   memcpy(&ipdst.address.ip_v6, sample->datap, 16);
   skipBytes(sample, 16);
-  sf_log("proxy_socket6_local_ip %s\n", printAddress(&ipsrc, buf, 50));
-  sf_log("proxy_socket6_remote_ip %s\n", printAddress(&ipdst, buf, 50));
+  sf_log(sample,"proxy_socket6_local_ip %s\n", printAddress(&ipsrc, buf));
+  sf_log(sample,"proxy_socket6_remote_ip %s\n", printAddress(&ipdst, buf));
   sf_log_next32(sample, "proxy_socket6_local_port");
   sf_log_next32(sample, "proxy_socket6_remote_port");
 }
@@ -2531,8 +2575,8 @@ static void readExtendedProxySocket6(SFSample *sample)
 static void readExtendedDecap(SFSample *sample, char *prefix)
 {
   uint32_t offset = getData32(sample);
-  sf_log("extendedType %sdecap\n", prefix);
-  sf_log("%sdecap_inner_header_offset %u\n", prefix, offset);
+  sf_log(sample,"extendedType %sdecap\n", prefix);
+  sf_log(sample,"%sdecap_inner_header_offset %u\n", prefix, offset);
 }
 
 /*_________________----------------------------__________________
@@ -2543,8 +2587,8 @@ static void readExtendedDecap(SFSample *sample, char *prefix)
 static void readExtendedVNI(SFSample *sample, char *prefix)
 {
   uint32_t vni = getData32(sample);
-  sf_log("extendedType %sVNI\n", prefix);
-  sf_log("%sVNI %u\n", prefix, vni);
+  sf_log(sample,"extendedType %sVNI\n", prefix);
+  sf_log(sample,"%sVNI %u\n", prefix, vni);
 }
 
 /*_________________---------------------------__________________
@@ -2554,15 +2598,15 @@ static void readExtendedVNI(SFSample *sample, char *prefix)
 
 static void readFlowSample_v2v4(SFSample *sample)
 {
-  sf_log("sampleType FLOWSAMPLE\n");
+  sf_log(sample,"sampleType FLOWSAMPLE\n");
 
   sample->samplesGenerated = getData32(sample);
-  sf_log("sampleSequenceNo %u\n", sample->samplesGenerated);
+  sf_log(sample,"sampleSequenceNo %u\n", sample->samplesGenerated);
   {
     uint32_t samplerId = getData32(sample);
     sample->ds_class = samplerId >> 24;
     sample->ds_index = samplerId & 0x00ffffff;
-    sf_log("sourceId %u:%u\n", sample->ds_class, sample->ds_index);
+    sf_log(sample,"sourceId %u:%u\n", sample->ds_class, sample->ds_index);
   }
   
   sample->meanSkipCount = getData32(sample);
@@ -2570,16 +2614,16 @@ static void readFlowSample_v2v4(SFSample *sample)
   sample->dropEvents = getData32(sample);
   sample->inputPort = getData32(sample);
   sample->outputPort = getData32(sample);
-  sf_log("meanSkipCount %u\n", sample->meanSkipCount);
-  sf_log("samplePool %u\n", sample->samplePool);
-  sf_log("dropEvents %u\n", sample->dropEvents);
-  sf_log("inputPort %u\n", sample->inputPort);
+  sf_log(sample,"meanSkipCount %u\n", sample->meanSkipCount);
+  sf_log(sample,"samplePool %u\n", sample->samplePool);
+  sf_log(sample,"dropEvents %u\n", sample->dropEvents);
+  sf_log(sample,"inputPort %u\n", sample->inputPort);
   if(sample->outputPort & 0x80000000) {
     uint32_t numOutputs = sample->outputPort & 0x7fffffff;
-    if(numOutputs > 0) sf_log("outputPort multiple %d\n", numOutputs);
-    else sf_log("outputPort multiple >1\n");
+    if(numOutputs > 0) sf_log(sample,"outputPort multiple %d\n", numOutputs);
+    else sf_log(sample,"outputPort multiple >1\n");
   }
-  else sf_log("outputPort %u\n", sample->outputPort);
+  else sf_log(sample,"outputPort %u\n", sample->outputPort);
   
   sample->packet_data_tag = getData32(sample);
   
@@ -2634,6 +2678,7 @@ static void readFlowSample_v2v4(SFSample *sample)
       break;
     case SFLFMT_CLF:
     case SFLFMT_FULL:
+    case SFLFMT_SCRIPT:
     default:
       /* if it was full-detail output then it was done as we went along */
       break;
@@ -2649,13 +2694,13 @@ static void readFlowSample_v2v4(SFSample *sample)
 static void readFlowSample(SFSample *sample, int expanded)
 {
   uint32_t num_elements, sampleLength;
-  u_char *sampleStart;
+  uint8_t *sampleStart;
 
-  sf_log("sampleType FLOWSAMPLE\n");
+  sf_log(sample,"sampleType FLOWSAMPLE\n");
   sampleLength = getData32(sample);
-  sampleStart = (u_char *)sample->datap;
+  sampleStart = (uint8_t *)sample->datap;
   sample->samplesGenerated = getData32(sample);
-  sf_log("sampleSequenceNo %u\n", sample->samplesGenerated);
+  sf_log(sample,"sampleSequenceNo %u\n", sample->samplesGenerated);
   if(expanded) {
     sample->ds_class = getData32(sample);
     sample->ds_index = getData32(sample);
@@ -2665,14 +2710,14 @@ static void readFlowSample(SFSample *sample, int expanded)
     sample->ds_class = samplerId >> 24;
     sample->ds_index = samplerId & 0x00ffffff;
   }
-  sf_log("sourceId %u:%u\n", sample->ds_class, sample->ds_index);
+  sf_log(sample,"sourceId %u:%u\n", sample->ds_class, sample->ds_index);
 
   sample->meanSkipCount = getData32(sample);
   sample->samplePool = getData32(sample);
   sample->dropEvents = getData32(sample);
-  sf_log("meanSkipCount %u\n", sample->meanSkipCount);
-  sf_log("samplePool %u\n", sample->samplePool);
-  sf_log("dropEvents %u\n", sample->dropEvents);
+  sf_log(sample,"meanSkipCount %u\n", sample->meanSkipCount);
+  sf_log(sample,"samplePool %u\n", sample->samplePool);
+  sf_log(sample,"dropEvents %u\n", sample->dropEvents);
   if(expanded) {
     sample->inputPortFormat = getData32(sample);
     sample->inputPort = getData32(sample);
@@ -2690,20 +2735,20 @@ static void readFlowSample(SFSample *sample, int expanded)
   }
 
   switch(sample->inputPortFormat) {
-  case 3: sf_log("inputPort format==3 %u\n", sample->inputPort); break;
-  case 2: sf_log("inputPort multiple %u\n", sample->inputPort); break;
-  case 1: sf_log("inputPort dropCode %u\n", sample->inputPort); break;
-  case 0: sf_log("inputPort %u\n", sample->inputPort); break;
+  case 3: sf_log(sample,"inputPort format==3 %u\n", sample->inputPort); break;
+  case 2: sf_log(sample,"inputPort multiple %u\n", sample->inputPort); break;
+  case 1: sf_log(sample,"inputPort dropCode %u\n", sample->inputPort); break;
+  case 0: sf_log(sample,"inputPort %u\n", sample->inputPort); break;
   }
 
   switch(sample->outputPortFormat) {
-  case 3: sf_log("outputPort format==3 %u\n", sample->outputPort); break;
-  case 2: sf_log("outputPort multiple %u\n", sample->outputPort); break;
-  case 1: sf_log("outputPort dropCode %u\n", sample->outputPort); break;
-  case 0: sf_log("outputPort %u\n", sample->outputPort); break;
+  case 3: sf_log(sample,"outputPort format==3 %u\n", sample->outputPort); break;
+  case 2: sf_log(sample,"outputPort multiple %u\n", sample->outputPort); break;
+  case 1: sf_log(sample,"outputPort dropCode %u\n", sample->outputPort); break;
+  case 0: sf_log(sample,"outputPort %u\n", sample->outputPort); break;
   }
 
-  // clear the CLF record
+  /* clear the CLF record */
   sfCLF.valid = NO;
   sfCLF.client[0] = '\0';
 
@@ -2712,12 +2757,12 @@ static void readFlowSample(SFSample *sample, int expanded)
     uint32_t el;
     for(el = 0; el < num_elements; el++) {
       uint32_t tag, length;
-      u_char *start;
+      uint8_t *start;
       char buf[51];
-      tag = getData32(sample);
-      sf_log("flowBlock_tag %s\n", printTag(tag, buf, 50));
+      tag = sample->elementType = getData32(sample);
+      sf_log(sample,"flowBlock_tag %s\n", printTag(tag, buf));
       length = getData32(sample);
-      start = (u_char *)sample->datap;
+      start = (uint8_t *)sample->datap;
 
       switch(tag) {
       case SFLFLOW_HEADER:     readFlowSample_header(sample); break;
@@ -2791,6 +2836,7 @@ static void readFlowSample(SFSample *sample, int expanded)
       }
       break;
     case SFLFMT_FULL:
+    case SFLFMT_SCRIPT:
     default:
       /* if it was full-detail output then it was done as we went along */
       break;
@@ -2912,7 +2958,7 @@ static void readCounters_vg(SFSample *sample)
 static void readCounters_vlan(SFSample *sample)
 {
   sample->in_vlan = getData32(sample);
-  sf_log("in_vlan %u\n", sample->in_vlan);
+  sf_log(sample,"in_vlan %u\n", sample->in_vlan);
   sf_log_next64(sample, "octets");
   sf_log_next32(sample, "ucastPkts");
   sf_log_next32(sample, "multicastPkts");
@@ -2976,6 +3022,19 @@ static void readCounters_radio(SFSample *sample)
 }
  
 /*_________________---------------------------__________________
+  _________________  readCounters_portName    __________________
+  -----------------___________________________------------------
+*/
+
+static void readCounters_portName(SFSample *sample)
+{
+  char ifname[SFL_MAX_PORTNAME_LEN+1];
+  if(getString(sample, ifname, SFL_MAX_PORTNAME_LEN) > 0) {
+    sf_log(sample,"ifName %s\n", ifname);
+  }
+}
+
+/*_________________---------------------------__________________
   _________________  readCounters_host_hid    __________________
   -----------------___________________________------------------
 */
@@ -2983,21 +3042,21 @@ static void readCounters_radio(SFSample *sample)
 static void readCounters_host_hid(SFSample *sample)
 {
   uint32_t i;
-  u_char *uuid;
+  uint8_t *uuid;
   char hostname[SFL_MAX_HOSTNAME_LEN+1];
   char os_release[SFL_MAX_OSRELEASE_LEN+1];
   if(getString(sample, hostname, SFL_MAX_HOSTNAME_LEN) > 0) {
-    sf_log("hostname %s\n", hostname);
+    sf_log(sample,"hostname %s\n", hostname);
   }
-  uuid = (u_char *)sample->datap;
-  sf_log("UUID ");
-  for(i = 0; i < 16; i++) sf_log("%02x", uuid[i]);
-  sf_log("\n");
+  uuid = (uint8_t *)sample->datap;
+  sf_log(sample,"UUID ");
+  for(i = 0; i < 16; i++) sf_log(sample,"%02x", uuid[i]);
+  sf_log(sample,"\n");
   skipBytes(sample, 16);
   sf_log_next32(sample, "machine_type");
   sf_log_next32(sample, "os_name");
   if(getString(sample, os_release, SFL_MAX_OSRELEASE_LEN) > 0) {
-    sf_log("os_release %s\n", os_release);
+    sf_log(sample,"os_release %s\n", os_release);
   }
 }
  
@@ -3008,16 +3067,16 @@ static void readCounters_host_hid(SFSample *sample)
 
 static void readCounters_adaptors(SFSample *sample)
 {
-  u_char *mac;
+  uint8_t *mac;
   uint32_t i, j, ifindex, num_macs, num_adaptors = getData32(sample);
   for(i = 0; i < num_adaptors; i++) {
     ifindex = getData32(sample);
-    sf_log("adaptor_%u_ifIndex %u\n", i, ifindex);
+    sf_log(sample,"adaptor_%u_ifIndex %u\n", i, ifindex);
     num_macs = getData32(sample);
-    sf_log("adaptor_%u_MACs %u\n", i, num_macs);
+    sf_log(sample,"adaptor_%u_MACs %u\n", i, num_macs);
     for(j = 0; j < num_macs; j++) {
-      mac = (u_char *)sample->datap;
-      sf_log("adaptor_%u_MAC_%u %02x%02x%02x%02x%02x%02x\n",
+      mac = (uint8_t *)sample->datap;
+      sf_log(sample,"adaptor_%u_MAC_%u %02x%02x%02x%02x%02x%02x\n",
 	     i, j,
 	     mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
       skipBytes(sample, 8);
@@ -3328,13 +3387,13 @@ static void readCounters_JVM(SFSample *sample)
   char vendor[SFLJVM_MAX_VENDOR_LEN];
   char version[SFLJVM_MAX_VERSION_LEN];
   if(getString(sample, vm_name, SFLJVM_MAX_VMNAME_LEN) > 0) {
-    sf_log("jvm_name %s\n", vm_name);
+    sf_log(sample,"jvm_name %s\n", vm_name);
   }
   if(getString(sample, vendor, SFLJVM_MAX_VENDOR_LEN) > 0) {
-    sf_log("jvm_vendor %s\n", vendor);
+    sf_log(sample,"jvm_vendor %s\n", vendor);
   }
   if(getString(sample, version, SFLJVM_MAX_VERSION_LEN) > 0) {
-    sf_log("jvm_version %s\n", version);
+    sf_log(sample,"jvm_version %s\n", version);
   }
 }
 
@@ -3377,7 +3436,7 @@ static void readCounters_APP(SFSample *sample)
 {
   char application[SFLAPP_MAX_APPLICATION_LEN];
   if(getString(sample, application, SFLAPP_MAX_APPLICATION_LEN) > 0) {
-    sf_log("application %s\n", application);
+    sf_log(sample,"application %s\n", application);
   }
   sf_log_next32(sample, "status_OK");
   sf_log_next32(sample, "errors_OTHER");
@@ -3467,10 +3526,10 @@ static void readCounters_LACP(SFSample *sample)
   sf_log_nextMAC(sample, "partnerSystemID");
   sf_log_next32(sample, "attachedAggID");
   portState.all = getData32_nobswap(sample);
-  sf_log("actorAdminPortState %u\n", portState.v.actorAdmin);
-  sf_log("actorOperPortState %u\n", portState.v.actorOper);
-  sf_log("partnerAdminPortState %u\n", portState.v.partnerAdmin);
-  sf_log("partnerOperPortState %u\n", portState.v.partnerOper);
+  sf_log(sample,"actorAdminPortState %u\n", portState.v.actorAdmin);
+  sf_log(sample,"actorOperPortState %u\n", portState.v.actorOper);
+  sf_log(sample,"partnerAdminPortState %u\n", portState.v.partnerAdmin);
+  sf_log(sample,"partnerOperPortState %u\n", portState.v.partnerOper);
   sf_log_next32(sample, "LACPDUsRx");
   sf_log_next32(sample, "markerPDUsRx");
   sf_log_next32(sample, "markerResponsePDUsRx");
@@ -3488,22 +3547,22 @@ static void readCounters_LACP(SFSample *sample)
 
 static void readCountersSample_v2v4(SFSample *sample)
 {
-  sf_log("sampleType COUNTERSSAMPLE\n");
+  sf_log(sample,"sampleType COUNTERSSAMPLE\n");
   sample->samplesGenerated = getData32(sample);
-  sf_log("sampleSequenceNo %u\n", sample->samplesGenerated);
+  sf_log(sample,"sampleSequenceNo %u\n", sample->samplesGenerated);
   {
     uint32_t samplerId = getData32(sample);
     sample->ds_class = samplerId >> 24;
     sample->ds_index = samplerId & 0x00ffffff;
   }
-  sf_log("sourceId %u:%u\n", sample->ds_class, sample->ds_index);
+  sf_log(sample,"sourceId %u:%u\n", sample->ds_class, sample->ds_index);
 
 
   sample->statsSamplingInterval = getData32(sample);
-  sf_log("statsSamplingInterval %u\n", sample->statsSamplingInterval);
+  sf_log(sample,"statsSamplingInterval %u\n", sample->statsSamplingInterval);
   /* now find out what sort of counter blocks we have here... */
   sample->counterBlockVersion = getData32(sample);
-  sf_log("counterBlockVersion %u\n", sample->counterBlockVersion);
+  sf_log(sample,"counterBlockVersion %u\n", sample->counterBlockVersion);
   
   /* first see if we should read the generic stats */
   switch(sample->counterBlockVersion) {
@@ -3541,13 +3600,13 @@ static void readCountersSample(SFSample *sample, int expanded)
 {
   uint32_t sampleLength;
   uint32_t num_elements;
-  u_char *sampleStart;
-  sf_log("sampleType COUNTERSSAMPLE\n");
+  uint8_t *sampleStart;
+  sf_log(sample,"sampleType COUNTERSSAMPLE\n");
   sampleLength = getData32(sample);
-  sampleStart = (u_char *)sample->datap;
+  sampleStart = (uint8_t *)sample->datap;
   sample->samplesGenerated = getData32(sample);
   
-  sf_log("sampleSequenceNo %u\n", sample->samplesGenerated);
+  sf_log(sample,"sampleSequenceNo %u\n", sample->samplesGenerated);
   if(expanded) {
     sample->ds_class = getData32(sample);
     sample->ds_index = getData32(sample);
@@ -3557,19 +3616,19 @@ static void readCountersSample(SFSample *sample, int expanded)
     sample->ds_class = samplerId >> 24;
     sample->ds_index = samplerId & 0x00ffffff;
   }
-  sf_log("sourceId %u:%u\n", sample->ds_class, sample->ds_index);
+  sf_log(sample,"sourceId %u:%u\n", sample->ds_class, sample->ds_index);
   
   num_elements = getData32(sample);
   {
     uint32_t el;
     for(el = 0; el < num_elements; el++) {
       uint32_t tag, length;
-      u_char *start;
+      uint8_t *start;
       char buf[51];
-      tag = getData32(sample);
-      sf_log("counterBlock_tag %s\n", printTag(tag, buf, 50));
+      tag = sample->elementType = getData32(sample);
+      sf_log(sample,"counterBlock_tag %s\n", printTag(tag, buf));
       length = getData32(sample);
-      start = (u_char *)sample->datap;
+      start = (uint8_t *)sample->datap;
       
       switch(tag) {
       case SFLCOUNTERS_GENERIC: readCounters_generic(sample); break;
@@ -3581,6 +3640,7 @@ static void readCountersSample(SFSample *sample, int expanded)
       case SFLCOUNTERS_LACP: readCounters_LACP(sample); break;
       case SFLCOUNTERS_PROCESSOR: readCounters_processor(sample); break;
       case SFLCOUNTERS_RADIO: readCounters_radio(sample); break;
+      case SFLCOUNTERS_PORTNAME: readCounters_portName(sample); break;
       case SFLCOUNTERS_HOST_HID: readCounters_host_hid(sample); break;
       case SFLCOUNTERS_ADAPTORS: readCounters_adaptors(sample); break;
       case SFLCOUNTERS_HOST_PAR: readCounters_host_parent(sample); break;
@@ -3627,14 +3687,14 @@ static void readSFlowDatagram(SFSample *sample)
   /* log some datagram info */
   now.tv_sec = (long)time(NULL);
   now.tv_usec = 0;
-  sf_log("datagramSourceIP %s\n", printAddress(&sample->sourceIP, buf, 50));
-  sf_log("datagramSize %u\n", sample->rawSampleLen);
-  sf_log("unixSecondsUTC %u\n", now.tv_sec);
-  if(sample->pcapTimestamp) sf_log("pcapTimestamp %s\n", ctime(&sample->pcapTimestamp)); // thanks to Richard Clayton for this bugfix
+  sf_log(sample,"datagramSourceIP %s\n", printAddress(&sample->sourceIP, buf));
+  sf_log(sample,"datagramSize %u\n", sample->rawSampleLen);
+  sf_log(sample,"unixSecondsUTC %u\n", now.tv_sec);
+  if(sample->pcapTimestamp) sf_log(sample,"pcapTimestamp %s\n", ctime(&sample->pcapTimestamp)); /* thanks to Richard Clayton for this bugfix */
 
   /* check the version */
   sample->datagramVersion = getData32(sample);
-  sf_log("datagramVersion %d\n", sample->datagramVersion);
+  sf_log(sample,"datagramVersion %d\n", sample->datagramVersion);
   if(sample->datagramVersion != 2 &&
      sample->datagramVersion != 4 &&
      sample->datagramVersion != 5) {
@@ -3647,29 +3707,29 @@ static void readSFlowDatagram(SFSample *sample)
   /* version 5 has an agent sub-id as well */
   if(sample->datagramVersion >= 5) {
     sample->agentSubId = getData32(sample);
-    sf_log("agentSubId %u\n", sample->agentSubId);
+    sf_log(sample,"agentSubId %u\n", sample->agentSubId);
   }
 
   sample->sequenceNo = getData32(sample);  /* this is the packet sequence number */
   sample->sysUpTime = getData32(sample);
   samplesInPacket = getData32(sample);
-  sf_log("agent %s\n", printAddress(&sample->agent_addr, buf, 50));
-  sf_log("packetSequenceNo %u\n", sample->sequenceNo);
-  sf_log("sysUpTime %u\n", sample->sysUpTime);
-  sf_log("samplesInPacket %u\n", samplesInPacket);
+  sf_log(sample,"agent %s\n", printAddress(&sample->agent_addr, buf));
+  sf_log(sample,"packetSequenceNo %u\n", sample->sequenceNo);
+  sf_log(sample,"sysUpTime %u\n", sample->sysUpTime);
+  sf_log(sample,"samplesInPacket %u\n", samplesInPacket);
 
   /* now iterate and pull out the flows and counters samples */
   {
     uint32_t samp = 0;
     for(; samp < samplesInPacket; samp++) {
-      if((u_char *)sample->datap >= sample->endp) {
+      if((uint8_t *)sample->datap >= sample->endp) {
 	fprintf(ERROUT, "unexpected end of datagram after sample %d of %d\n", samp, samplesInPacket);
 	SFABORT(sample, SF_ABORT_EOS);
       }
-      // just read the tag, then call the approriate decode fn
+      /* just read the tag, then call the approriate decode fn */
       sample->sampleType = getData32(sample);
-      sf_log("startSample ----------------------\n");
-      sf_log("sampleType_tag %s\n", printTag(sample->sampleType, buf, 50));
+      sf_log(sample,"startSample ----------------------\n");
+      sf_log(sample,"sampleType_tag %s\n", printTag(sample->sampleType, buf));
       if(sample->datagramVersion >= 5) {
 	switch(sample->sampleType) {
 	case SFLFLOW_SAMPLE: readFlowSample(sample, NO); break;
@@ -3686,7 +3746,7 @@ static void readSFlowDatagram(SFSample *sample)
 	default: receiveError(sample, "unexpected sample type", YES); break;
 	}
       }
-      sf_log("endSample   ----------------------\n");
+      sf_log(sample,"endSample   ----------------------\n");
     }
   }
 }
@@ -3699,8 +3759,8 @@ static void readSFlowDatagram(SFSample *sample)
 static void receiveSFlowDatagram(SFSample *sample)
 {
   if(sfConfig.forwardingTargets) {
-    // if we are forwarding, then do nothing else (it might
-    // be important from a performance point of view).
+    /* if we are forwarding, then do nothing else (it might
+       be important from a performance point of view). */
     SFForwardingTarget *tgt = sfConfig.forwardingTargets;
     for( ; tgt != NULL; tgt = tgt->nxt) {
       int bytesSent;
@@ -3719,18 +3779,18 @@ static void receiveSFlowDatagram(SFSample *sample)
   }
   else {
     int exceptionVal;
-    sf_log("startDatagram =================================\n");
+    sf_log(sample,"startDatagram =================================\n");
     if((exceptionVal = setjmp(sample->env)) == 0)  {
-      // TRY
+      /* TRY */
       sample->datap = (uint32_t *)sample->rawSample;
-      sample->endp = (u_char *)sample->rawSample + sample->rawSampleLen;
+      sample->endp = (uint8_t *)sample->rawSample + sample->rawSampleLen;
       readSFlowDatagram(sample);
     }
     else {
-      // CATCH
+      /* CATCH */
       fprintf(ERROUT, "caught exception: %d\n", exceptionVal);
     }
-    sf_log("endDatagram   =================================\n");
+    sf_log(sample, "endDatagram   =================================\n");
     fflush(stdout);
   }
 }
@@ -3748,7 +3808,7 @@ static int openInputUDPSocket(uint16_t port)
   /* Create socket */
   memset((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
   myaddr_in.sin_family = AF_INET;
-  //myaddr_in6.sin6_addr.s_addr = INADDR_ANY;
+  /* myaddr_in6.sin6_addr.s_addr = INADDR_ANY; */
   myaddr_in.sin_port = htons(port);
   
   if ((soc = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
@@ -3784,7 +3844,7 @@ static int openInputUDP6Socket(uint16_t port)
   /* Create socket */
   memset((char *)&myaddr_in6, 0, sizeof(struct sockaddr_in6));
   myaddr_in6.sin6_family = AF_INET6;
-  //myaddr_in6.sin6_addr = INADDR_ANY;
+  /* myaddr_in6.sin6_addr = INADDR_ANY; */
   myaddr_in6.sin6_port = htons(port);
   
   if ((soc = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
@@ -3813,8 +3873,8 @@ static int openInputUDP6Socket(uint16_t port)
 */
 
 static int ipv4MappedAddress(SFLIPv6 *ipv6addr, SFLIPv4 *ip4addr) {
-    static u_char mapped_prefix[] = { 0,0,0,0,0,0,0,0,0,0,0xFF,0xFF };
-    static u_char compat_prefix[] = { 0,0,0,0,0,0,0,0,0,0,0,0 };
+    static uint8_t mapped_prefix[] = { 0,0,0,0,0,0,0,0,0,0,0xFF,0xFF };
+    static uint8_t compat_prefix[] = { 0,0,0,0,0,0,0,0,0,0,0,0 };
     if(!memcmp(ipv6addr->addr, mapped_prefix, 12) ||
        !memcmp(ipv6addr->addr, compat_prefix, 12)) {
         memcpy(ip4addr, ipv6addr->addr + 12, 4);
@@ -3843,7 +3903,7 @@ static void readPacket(int soc)
   }
   SFSample sample;
   memset(&sample, 0, sizeof(sample));
-  sample.rawSample = (u_char *)buf;
+  sample.rawSample = (uint8_t *)buf;
   sample.rawSampleLen = cc;
   if(alen == sizeof(struct sockaddr_in)) {
     struct sockaddr_in *peer4 = (struct sockaddr_in *)&peer;
@@ -3877,18 +3937,35 @@ static void readPacket(int soc)
   or -1 if not found. Decode the 802.1d if it's there.
 */
 
-static int pcapOffsetToSFlow(u_char *start, int len)
+static int pcapOffsetToSFlow(uint8_t *start, int len)
 {
-  u_char *end = start + len;
-  u_char *ptr = start;
+  uint8_t *end = start + len;
+  uint8_t *ptr = start;
   uint16_t type_len;
 
-  // assume Ethernet header
-  if(len < NFT_ETHHDR_SIZ) return -1; /* not enough for an Ethernet header */
-  ptr += 6; // dst
-  ptr += 6; // src
-  type_len = (ptr[0] << 8) + ptr[1];
-  ptr += 2;
+  switch(sfConfig.readPcapHdr.linktype) {
+  case DLT_LINUX_SLL:
+    {
+      uint16_t packet_type = (ptr[0] << 8) + ptr[1];
+      uint16_t arphrd_type = (ptr[2] << 8) + ptr[3];
+      uint16_t lladdr_len = (ptr[4] << 8) + ptr[5];
+      /* but lladdr field is always 8 bytes regardless */
+      ptr += 6 + 8;
+      type_len = (ptr[0] << 8) + ptr[1];
+      ptr += 2;
+    }
+    break;
+      
+  case DLT_EN10MB:
+  default:
+    /* assume Ethernet header */
+    if(len < NFT_ETHHDR_SIZ) return -1; /* not enough for an Ethernet header */
+    ptr += 6; /* dst */
+    ptr += 6; /* src */
+    type_len = (ptr[0] << 8) + ptr[1];
+    ptr += 2;
+    break;
+  }
 
   while(type_len == 0x8100
 	|| type_len == 0x9100) {
@@ -3972,7 +4049,7 @@ static int pcapOffsetToSFlow(u_char *start, int len)
     ptr += 40;
   }
 
-  // still have to skip over UDP header
+  /* still have to skip over UDP header */
   ptr += 8;
   if(ptr >= end) return -1;
   return (ptr - start);
@@ -3983,7 +4060,7 @@ static int pcapOffsetToSFlow(u_char *start, int len)
 
 static int readPcapPacket(FILE *file)
 {
-  u_char buf[2048];
+  uint8_t buf[2048];
   struct pcap_pkthdr hdr;
   SFSample sample;
   int skipBytes = 0;
@@ -4017,9 +4094,9 @@ static int readPcapPacket(FILE *file)
     fprintf(ERROUT, "incomplete datagram (pcap snaplen too short)\n");
   }
   else {
-    // need to skip over the encapsulation in the captured packet.
-    // -- should really do this by checking for 802.2, IP options etc.  but
-    // for now we just assume ethernet + IP + UDP
+    /* need to skip over the encapsulation in the captured packet.
+       -- should really do this by checking for 802.2, IP options etc.  but
+       for now we just assume ethernet + IP + UDP */
     skipBytes = pcapOffsetToSFlow(buf, hdr.caplen);
     memset(&sample, 0, sizeof(sample));
     sample.rawSample = buf + skipBytes;
@@ -4050,27 +4127,27 @@ static void testVlan(uint32_t num) {
   }
 }
 
-static void parseVlanFilter(u_char *array, u_char flag, char *start)
+static void parseVlanFilter(uint8_t *array, uint8_t flag, char *start)
 {
   char *p = start;
   char *sep = " ,";
   do {
-	uint32_t first, last;
-    p += strspn(p, sep); // skip separators
+    uint32_t first, last;
+    p += strspn(p, sep); /* skip separators */
     peekForNumber(p);
-    first = strtol(p, &p, 0); // read an integer
+    first = strtol(p, &p, 0); /* read an integer */
     testVlan(first);
     array[first] = flag;
     if(*p == '-') {
-      // a range. skip the '-' (so it doesn't get interpreted as unary minus)
+      /* a range. skip the '-' (so it doesn't get interpreted as unary minus) */
       p++;
-      // and read the second integer
+      /* and read the second integer */
       peekForNumber(p);
       last = strtol(p, &p, 0);
       testVlan(last);
       if(last > first) {
 	uint32_t i;
-	// iterate over the range
+	/* iterate over the range */
 	for(i = first; i <= last; i++) array[i] = flag;
       }
     }
@@ -4086,8 +4163,8 @@ static void parseVlanFilter(u_char *array, u_char flag, char *start)
 
 static int addForwardingTarget(char *hostandport)
 {
-  SFForwardingTarget *tgt = (SFForwardingTarget *)calloc(1, sizeof(SFForwardingTarget));
-  // expect <host>/<port>
+  SFForwardingTarget *tgt = (SFForwardingTarget *)my_calloc(sizeof(SFForwardingTarget));
+  /* expect <host>/<port> */
 #define MAX_HOSTANDPORT_LEN 100
   char hoststr[MAX_HOSTANDPORT_LEN+1];
   char *p;
@@ -4096,25 +4173,25 @@ static int addForwardingTarget(char *hostandport)
     return NO;
   }
   if(strlen(hostandport) > MAX_HOSTANDPORT_LEN) return NO;
-  // take a copy
+  /* take a copy */
   strcpy(hoststr, hostandport);
-  // find the '/'
+  /* find the '/' */
   for(p = hoststr; *p != '\0'; p++) if(*p == '/') break;
   if(*p == '\0') {
-    // not found
+    /* not found */
     fprintf(ERROUT, "host/port - no '/' found\n");
     return NO;
   }
-  (*p) = '\0'; // blat in a zero
+  (*p) = '\0'; /* blat in a zero */
   p++;
-  // now p points to port string, and hoststr is just the hostname or IP
+  /* now p points to port string, and hoststr is just the hostname or IP */
   {
     struct hostent *ent = gethostbyname(hoststr);
     if(ent == NULL) {
       fprintf(ERROUT, "hostname %s lookup failed\n", hoststr);
       return NO;
     }
-    else tgt->host.s_addr = ((struct in_addr *)(ent->h_addr))->s_addr;
+    else tgt->host.s_addr = ((struct in_addr *)(ent->h_addr_list[0]))->s_addr;
   }
   sscanf(p, "%u", &tgt->port);
   if(tgt->port <= 0 || tgt->port >= 65535) {
@@ -4152,12 +4229,16 @@ static void instructions(char *command)
   fprintf(ERROUT,"\n");
   fprintf(ERROUT,"%s version: %s\n", command, VERSION);
   fprintf(ERROUT,"\n");
+  fprintf(ERROUT,"usage:\n");
+  fprintf(ERROUT, "   -h | -?            -  this help message\n");
+  fprintf(ERROUT,"\n");
   fprintf(ERROUT,"forwarding:\n");
   fprintf(ERROUT, "   -f host/port       -  (forward sflow to another collector\n");
   fprintf(ERROUT, "                      -   ...repeat for multiple collectors)\n");
   fprintf(ERROUT,"\n");
-  fprintf(ERROUT,"csv output:\n");
-  fprintf(ERROUT, "   -l                 -  (output in line-by-line format)\n");
+  fprintf(ERROUT,"txt output:\n");
+  fprintf(ERROUT, "   -l                 -  (output in line-by-line CSV format)\n");
+  fprintf(ERROUT, "   -g                 -  (output in 'grep-friendly' format)\n");
   fprintf(ERROUT, "   -H                 -  (output HTTP common log file format)\n");
   fprintf(ERROUT,"\n");
   fprintf(ERROUT,"tcpdump output:\n");
@@ -4183,11 +4264,13 @@ static void instructions(char *command)
   fprintf(ERROUT, "   -6                 -  listen on IPv6 socket only\n");
   fprintf(ERROUT, "   +4                 -  listen on both IPv4 and IPv6 sockets\n");
   fprintf(ERROUT, "\n");
+  fprintf(ERROUT,"General options:\n");
+  fprintf(ERROUT, "   -k                 -  keep going on non-signal errors rather than aborting\n");
+  fprintf(ERROUT, "\n");
   fprintf(ERROUT, "=============== Advanced Tools ==============================================\n");
   fprintf(ERROUT, "| sFlowTrend (FREE)     - http://www.inmon.com/products/sFlowTrend.php      |\n");
   fprintf(ERROUT, "| Traffic Sentinel      - http://www.inmon.com/support/sentinel_release.php |\n");
   fprintf(ERROUT, "=============================================================================\n");
-  exit(1);
 }
 
 /*_________________---------------------------__________________
@@ -4200,6 +4283,7 @@ static void process_command_line(int argc, char *argv[])
   int arg = 1, in = 0;
   int i;
   int plus,minus;
+  size_t len_str;
 
   /* set defaults */
   sfConfig.sFlowInputPort = 6343;
@@ -4210,25 +4294,39 @@ static void process_command_line(int argc, char *argv[])
   sfConfig.listen4 = NO;
   sfConfig.listen6 = YES;
 #endif
+  sfConfig.keepGoing = NO;
 
   /* walk though the args */
   while (arg < argc) {
     plus = (argv[arg][0] == '+');
     minus = (argv[arg][0] == '-');
-    if(plus == NO && minus == NO) instructions(*argv);
+    if(plus == NO && minus == NO) { instructions(*argv); exit(1); }
     in = argv[arg++][1];
-    /* some options expect an argument - check for that first */
+    /* check first that options with/without arguments are correct */
     switch(in) {
+    case 't':
+    case 'l':
+    case 'g':
+    case 'H':
+    case 'x':
+    case 'e':
+    case 's':
+#ifdef SPOOFSOURCE
+    case 'S':
+#endif
+    case '4':
+    case '6':
+    case 'k':
+    case '?':
+    case 'h': break;
     case 'p':
     case 'r':
     case 'z':
     case 'c':
     case 'd':
     case 'f':
-    case 'v':
-      if(arg >= argc) instructions(*argv);
-      break;
-    default: break;
+    case 'v': if(arg < argc) break;
+    default: instructions(*argv); exit(1);
     }
 
     switch(in) {
@@ -4236,7 +4334,12 @@ static void process_command_line(int argc, char *argv[])
     case 't': sfConfig.outputFormat = SFLFMT_PCAP; break;
     case 'l': sfConfig.outputFormat = SFLFMT_LINE; break;
     case 'H': sfConfig.outputFormat = SFLFMT_CLF; break;
-    case 'r': sfConfig.readPcapFileName = strdup(argv[arg++]); break;
+    case 'g': sfConfig.outputFormat = SFLFMT_SCRIPT; break;
+    case 'r':
+        len_str = strlen(argv[arg]); /* argv[arg] already null-terminated */
+        sfConfig.readPcapFileName = my_calloc(len_str+1);
+	memcpy(sfConfig.readPcapFileName, argv[arg++], len_str);
+        break;
     case 'x': sfConfig.removeContent = YES; break;
     case 'z': sfConfig.tcpdumpHdrPad = atoi(argv[arg++]); break;
     case 'c':
@@ -4246,7 +4349,7 @@ static void process_command_line(int argc, char *argv[])
 	  fprintf(ERROUT, "netflow collector hostname lookup failed\n");
 	  exit(-8);
         }
-    	sfConfig.netFlowOutputIP.s_addr = ((struct in_addr *)(ent->h_addr))->s_addr;
+    	sfConfig.netFlowOutputIP.s_addr = ((struct in_addr *)(ent->h_addr_list[0]))->s_addr;
 	sfConfig.outputFormat = SFLFMT_NETFLOW;
       }
       break;
@@ -4265,14 +4368,14 @@ static void process_command_line(int argc, char *argv[])
       break;
     case 'v':
       if(plus) {
-	// +v => include vlans
+	/* +v => include vlans */
 	sfConfig.gotVlanFilter = YES;
 	parseVlanFilter(sfConfig.vlanFilter, YES, argv[arg++]);
       }
       else {
-	// -v => exclude vlans
+	/* -v => exclude vlans */
 	if(! sfConfig.gotVlanFilter) {
-	  // when we start with an exclude list, that means the default should be YES
+	  /* when we start with an exclude list, that means the default should be YES */
 	  for(i = 0; i < FILTER_MAX_VLAN; i++) sfConfig.vlanFilter[i] = YES;
 	  sfConfig.gotVlanFilter = YES;
 	}
@@ -4289,9 +4392,9 @@ static void process_command_line(int argc, char *argv[])
       sfConfig.listen4 = NO;
       sfConfig.listen6 = YES;
       break;
-    case '?':
-    case 'h':
-    default: instructions(*argv);
+    case 'k': sfConfig.keepGoing = YES; break;
+    /* remaining are -h or -? */
+    default: instructions(*argv); exit(0);
     }
   }
 }
@@ -4315,7 +4418,7 @@ int main(int argc, char *argv[])
   process_command_line(argc, argv);
 
 #ifdef WIN32
-  // on windows we need to tell stdout if we want it to be binary
+  /* on windows we need to tell stdout if we want it to be binary */
   if(sfConfig.outputFormat == SFLFMT_PCAP) setmode(1, O_BINARY);
 #endif
 
@@ -4376,11 +4479,22 @@ int main(int argc, char *argv[])
 		    &timeout);
       /* we may return prematurely if a signal was caught, in which case
        * nfds will be -1 and errno will be set to EINTR.  If we get any other
-       * error, abort.
+       * error, abort (unless keepGoing is set).
        */
       if(nfds < 0 && errno != EINTR) {
 	fprintf(ERROUT, "select() returned %d\n", nfds);
-	exit(-9);
+        if(sfConfig.keepGoing) {
+	  /* we are going to try and keep going, but if we are going to do
+	     that we have to make sure we don't end up in a busy-loop or
+	     fill the disk with logging somewhere. The safest way is probably
+	     just to sleep here for a second before we go back and try again. */
+	  timeout.tv_sec = 1;
+	  timeout.tv_usec = 0;
+	  (void)select(1, NULL, NULL, NULL, &timeout);
+	}
+	else {
+          exit(-9);
+	}
       }
       if(nfds > 0) {
 	if(soc4 != -1 && FD_ISSET(soc4, &readfds)) readPacket(soc4);
