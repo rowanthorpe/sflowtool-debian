@@ -1,6 +1,5 @@
 0005-fix-strdup-mem-leak.patch
 0007-replace-snprintf-and-strdup-remove-unused-lens.patch
-0008-update-deprecated-gethostbyname-format.patch
 0009-add-missing-include.patch
 0010-strict-ansi-types-coercions-syntax.patch
 0011-comment-unused-functions.patch
