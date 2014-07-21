@@ -1,0 +1,15 @@
+Description: Coerce size_t to long long unsigned for portable printf
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2014-07-21
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -443,7 +443,7 @@
+ void *my_calloc(size_t bytes) {
+   void *mem = calloc(1, bytes);
+   if(mem == NULL) {
+-    fprintf(ERROUT, "calloc(%u) failed: %s\n", bytes, strerror(errno));
++    fprintf(ERROUT, "calloc(%llu) failed: %s\n", (long long unsigned)bytes, strerror(errno));
+     exit(-1);
+   }
+   return mem;

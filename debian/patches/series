@@ -1,3 +1,4 @@
 0005-fix-strdup-mem-leak.patch
 0010-strict-ansi-types-coercions-syntax.patch
 0015-downgrade-automake-dep-for-clean-build-on-wheezy.patch
+0016-coerce-size_t_portably-for-printf.patch
