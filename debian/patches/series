@@ -1,5 +1,4 @@
 0005-fix-strdup-mem-leak.patch
 0007-replace-snprintf-and-strdup-remove-unused-lens.patch
 0010-strict-ansi-types-coercions-syntax.patch
-0012-use-only-ansi-comments.patch
 0015-downgrade-automake-dep-for-clean-build-on-wheezy.patch
