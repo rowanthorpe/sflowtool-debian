@@ -1,3 +1,27 @@
+sflowtool (3.31-1) unstable; urgency=medium
+
+  * Imported Upstream version 3.31
+  * Drop move-configure.in-to-configure.ac.patch, integrated upstream
+  * Drop examples-interpreter-locations.patch, integrated upstream
+  * Refresh fix-strdup-mem-leak.patch
+  * Drop improve-flag-parsing.patch, integrated upstream
+  * Drop update-deprecated-gethostbyname-format.patch, integrated upstream
+  * Drop add-missing-include.patch, integrated upstream
+  * Drop silence-non-portable-format-warning.patch, integrated upstream
+  * Drop comment-unused-functions.patch, integrated upstream
+  * Drop add-keepgoing-flag.patch, integrated upstream
+  * Drop use-only-ansi-comments.patch, integrated upstream
+  * Drop replace-snprintf-and-strdup-remove-unused-lens.patch, integrated
+    upstream
+  * Refresh strict-ansi-types-coercions-syntax.patch, partially integrated
+    upstream
+  * Refresh downgrade-automake-dep-for-clean-build-on-wheezy.patch
+  * Add coerce-size_t-portably-for-printf.patch
+  * Version dependency bump in control file
+  * Update documentation for changes
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Mon, 21 Jul 2014 15:59:03 +0300
+
 sflowtool (3.30-2) unstable; urgency=low
 
   * Add fix-strdup-mem-leak.patch
