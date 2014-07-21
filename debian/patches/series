@@ -3,6 +3,5 @@
 0010-strict-ansi-types-coercions-syntax.patch
 0011-comment-unused-functions.patch
 0012-use-only-ansi-comments.patch
-0013-silence-non-portable-format-warning.patch
 0014-add-keepgoing-flag.patch
 0015-downgrade-automake-dep-for-clean-build-on-wheezy.patch
