@@ -2,12 +2,12 @@
 .\"     Title: SFLOWTOOL
 .\"    Author: Rowan Thorpe <rowan@rowanthorpe.com>
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: March 3, 2014
+.\"      Date: July 21, 2014
 .\"    Manual: System administration commands and daemons
-.\"    Source: sflowtool 3.30
+.\"    Source: sflowtool 3.31
 .\"  Language: English
 .\"
-.TH "SFLOWTOOL" "8" "March 3, 2014" "sflowtool 3\&.30" "System administration commands"
+.TH "SFLOWTOOL" "8" "July 21, 2014" "sflowtool 3\&.31" "System administration commands"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -53,7 +53,12 @@ Forward sflow to another collector (repeat for multiple collectors)\&.
 .PP
 \fB\-l\fR
 .RS 4
-Output in line\-by\-line format\&.
+Output in line\-by\-line CSV format\&.
+.RE
+.PP
+\fB\-g\fR
+.RS 4
+Output in \*(Aqgrep\-friendly\*(Aq format\&.
 .RE
 .PP
 \fB\-H\fR

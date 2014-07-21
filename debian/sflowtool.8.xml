@@ -2,9 +2,9 @@
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
 "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
 
-<!ENTITY dhdate          "March 3, 2014">
+<!ENTITY dhdate          "July 21, 2014">
 <!ENTITY dhyears         "<year>2013,2014</year>">
-<!ENTITY dhversion       "3.30">
+<!ENTITY dhversion       "3.31">
 <!ENTITY dhemail         "<email>rowan@rowanthorpe.com</email>">
 <!ENTITY dhupstreamemail "<email>neil.mckee@inmon.com</email>">
 <!ENTITY dhfirstname     "<firstname>Rowan</firstname>">
@@ -105,7 +105,11 @@
    </varlistentry>
    <varlistentry>
     <term><option>-l</option></term>
-    <listitem><simpara>Output in line-by-line format.</simpara></listitem>
+    <listitem><simpara>Output in line-by-line CSV format.</simpara></listitem>
+   </varlistentry>
+   <varlistentry>
+    <term><option>-g</option></term>
+    <listitem><simpara>Output in 'grep-friendly' format.</simpara></listitem>
    </varlistentry>
    <varlistentry>
     <term><option>-H</option></term>
