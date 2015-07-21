@@ -12,7 +12,7 @@ XS-Autobuild: yes
 Package: sflowtool
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Replaces: sflowtool (<< 3.33-1)
+Replaces: sflowtool (<< 3.34-1)
 Description: Command line utility for decoding and analyzing sflow data
  sflowtool interfaces to utilities such as tcpdump, ntop and Snort for
  detailed packet tracing and analysis, NetFlow compatible collectors for IP
