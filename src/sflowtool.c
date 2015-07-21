@@ -518,6 +518,33 @@ int printHex(const uint8_t *a, int len, uint8_t *buf, int bufLen, int marker, in
 }
 
 /*_________________---------------------------__________________
+  _________________      printUUID            __________________
+  -----------------___________________________------------------
+*/
+  
+  int printUUID(const u_char *a, u_char *buf, int bufLen)
+  {
+    int i, b = 0;
+    b += printHex(a, 4, buf, bufLen, 0, 100);
+    buf[b++] = '-';
+    b += printHex(a + 4, 2, buf + b, bufLen - b, 0, 100);
+    buf[b++] = '-';
+    b += printHex(a + 6, 2, buf + b, bufLen - b, 0, 100);
+    buf[b++] = '-';
+    b += printHex(a + 8, 2, buf + b, bufLen - b, 0, 100);
+    buf[b++] = '-';
+    b += printHex(a + 10, 6, buf + b, bufLen - b, 0, 100);
+    
+    // should really be lowercase hex - fix that here
+    for(i = 0; i < b; i++) buf[i] = tolower(buf[i]);
+
+    // add NUL termination
+    buf[b] = '\0';
+
+    return b;
+  }
+
+/*_________________---------------------------__________________
   _________________       URLEncode           __________________
   -----------------___________________________------------------
 */
@@ -2319,6 +2346,10 @@ static void readFlowSample_memcache(SFSample *sample)
   -----------------____________________________------------------
 */
 
+/* absorb compiler warning about strftime printing */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat"
+
 static void readFlowSample_http(SFSample *sample, uint32_t tag)
 {
   char uri[SFL_MAX_HTTP_URI+1];
@@ -2370,10 +2401,7 @@ static void readFlowSample_http(SFSample *sample, uint32_t tag)
   if(sfConfig.outputFormat == SFLFMT_CLF) {
     time_t now = time(NULL);
     char nowstr[200];
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat"
     strftime(nowstr, 200, "%d/%b/%Y:%H:%M:%S %z", localtime(&now)); /* there seems to be no simple portable equivalent to %z */
-#pragma GCC diagnostic pop
     /* should really be: snprintf(sfCLF.http_log, SFLFMT_CLF_MAX_LINE,...) but snprintf() is not always available */
     sprintf(sfCLF.http_log, "- %s [%s] \"%s %s HTTP/%u.%u\" %u %"PRIu64" \"%s\" \"%s\"",
 	     authuser[0] ? authuser : "-",
@@ -2389,6 +2417,8 @@ static void readFlowSample_http(SFSample *sample, uint32_t tag)
     sfCLF.valid = YES;
   }
 }
+
+#pragma GCC diagnostic pop
 
 /*_________________----------------------------__________________
   _________________  readFlowSample_APP        __________________
@@ -3045,13 +3075,13 @@ static void readCounters_host_hid(SFSample *sample)
   uint8_t *uuid;
   char hostname[SFL_MAX_HOSTNAME_LEN+1];
   char os_release[SFL_MAX_OSRELEASE_LEN+1];
+  char uuidStr[100];
   if(getString(sample, hostname, SFL_MAX_HOSTNAME_LEN) > 0) {
     sf_log(sample,"hostname %s\n", hostname);
   }
   uuid = (uint8_t *)sample->datap;
-  sf_log(sample,"UUID ");
-  for(i = 0; i < 16; i++) sf_log(sample,"%02x", uuid[i]);
-  sf_log(sample,"\n");
+  printUUID(uuid, uuidStr, 100);
+  sf_log(sample,"UUID %s\n", uuidStr);
   skipBytes(sample, 16);
   sf_log_next32(sample, "machine_type");
   sf_log_next32(sample, "os_name");
