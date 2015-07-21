@@ -4,7 +4,7 @@ Author: Rowan Thorpe <rowan@rowanthorpe.com>
 Last-Update: 2014-03-03
 --- a/src/sflowtool.c
 +++ b/src/sflowtool.c
-@@ -4458,9 +4458,11 @@
+@@ -4459,9 +4459,11 @@
      else sfConfig.readPcapFile = fopen(sfConfig.readPcapFileName, "rb");
      if(sfConfig.readPcapFile == NULL) {
        fprintf(ERROUT, "cannot open %s : %s\n", sfConfig.readPcapFileName, strerror(errno));
