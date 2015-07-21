@@ -188,7 +188,7 @@ Last-Update: 2014-03-03
    sf_log(sample,"flowSampleType http\n");
    method = sf_log_next32(sample, "http_method");
    protocol = sf_log_next32(sample, "http_protocol");
-@@ -3794,7 +3830,7 @@
+@@ -3795,7 +3831,7 @@
      SFForwardingTarget *tgt = sfConfig.forwardingTargets;
      for( ; tgt != NULL; tgt = tgt->nxt) {
        int bytesSent;
@@ -197,7 +197,7 @@ Last-Update: 2014-03-03
  			     (const char *)sample->rawSample,
  			     sample->rawSampleLen,
  			     0,
-@@ -3834,6 +3870,9 @@
+@@ -3835,6 +3871,9 @@
  {
    int soc;
    struct sockaddr_in myaddr_in;
@@ -207,7 +207,7 @@ Last-Update: 2014-03-03
  
    /* Create socket */
    memset((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
-@@ -3848,7 +3887,7 @@
+@@ -3849,7 +3888,7 @@
  
  #ifndef WIN32
    /* make socket non-blocking */
@@ -216,7 +216,7 @@ Last-Update: 2014-03-03
    save_fd |= O_NONBLOCK;
    fcntl(soc, F_SETFL, save_fd);
  #endif /* WIN32 */
-@@ -3870,6 +3909,9 @@
+@@ -3871,6 +3910,9 @@
  {
    int soc;
    struct sockaddr_in6 myaddr_in6;
@@ -226,7 +226,7 @@ Last-Update: 2014-03-03
  
    /* Create socket */
    memset((char *)&myaddr_in6, 0, sizeof(struct sockaddr_in6));
-@@ -3884,7 +3926,7 @@
+@@ -3885,7 +3927,7 @@
  
  #ifndef WIN32
    /* make socket non-blocking */
@@ -235,7 +235,7 @@ Last-Update: 2014-03-03
    save_fd |= O_NONBLOCK;
    fcntl(soc, F_SETFL, save_fd);
  #endif /* WIN32 */
-@@ -3921,7 +3963,9 @@
+@@ -3922,7 +3964,9 @@
  static void readPacket(int soc)
  {
    struct sockaddr_in6 peer;
@@ -246,7 +246,7 @@ Last-Update: 2014-03-03
  #define MAX_PKT_SIZ 65536
    char buf[MAX_PKT_SIZ];
    alen = sizeof(peer);
-@@ -3931,10 +3975,9 @@
+@@ -3932,10 +3976,9 @@
      fprintf(ERROUT, "recvfrom() failed, %s\n", strerror(errno));
      return;
    }
@@ -258,7 +258,7 @@ Last-Update: 2014-03-03
    if(alen == sizeof(struct sockaddr_in)) {
      struct sockaddr_in *peer4 = (struct sockaddr_in *)&peer;
      sample.sourceIP.type = SFLADDRESSTYPE_IP_V4;
-@@ -4011,7 +4054,7 @@
+@@ -4012,7 +4055,7 @@
    }
  
    /* now we're just looking for IP */
@@ -267,7 +267,7 @@ Last-Update: 2014-03-03
    
    /* peek for IPX */
    if(type_len == 0x0200 || type_len == 0x0201 || type_len == 0x0600) {
-@@ -4061,7 +4104,7 @@
+@@ -4062,7 +4105,7 @@
  
    if(type_len == 0x0800) {
      /* IPV4 */
@@ -276,7 +276,7 @@ Last-Update: 2014-03-03
      /* look at first byte of header.... */
      /*  ___________________________ */
      /* |   version   |    hdrlen   | */
-@@ -4310,7 +4353,8 @@
+@@ -4311,7 +4354,8 @@
  
  static void process_command_line(int argc, char *argv[])
  {
@@ -286,7 +286,7 @@ Last-Update: 2014-03-03
    int i;
    int plus,minus;
    size_t len_str;
-@@ -4331,7 +4375,7 @@
+@@ -4332,7 +4376,7 @@
      plus = (argv[arg][0] == '+');
      minus = (argv[arg][0] == '-');
      if(plus == NO && minus == NO) { instructions(*argv); exit(1); }
