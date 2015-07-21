@@ -29,7 +29,7 @@ Last-Update: 2014-03-03
    uint32_t stripped;
  
    /* header decode */
-@@ -527,7 +528,7 @@
+@@ -554,7 +555,7 @@
    register char c, *r = in, *w = out;
    int maxlen = (strlen(in) * 3) + 1;
    if(outlen < maxlen) return "URLEncode: not enough space";
@@ -38,7 +38,7 @@ Last-Update: 2014-03-03
      if(isalnum(c)) *w++ = c;
      else if(isspace(c)) *w++ = '+';
      else {
-@@ -825,7 +826,7 @@
+@@ -852,7 +853,7 @@
  
    if(type_len == 0x0800) {
      /* IPV4 */
@@ -47,7 +47,7 @@ Last-Update: 2014-03-03
      /* look at first byte of header.... */
      /*  ___________________________ */
      /* |   version   |    hdrlen   | */
-@@ -858,32 +859,63 @@
+@@ -885,32 +886,63 @@
  
  static void decode80211MAC(SFSample *sample)
  {
@@ -128,7 +128,7 @@ Last-Update: 2014-03-03
    ptr += 2;
  
    switch(control) {
-@@ -895,13 +927,13 @@
+@@ -922,13 +954,13 @@
    case 2: /* data */
      {
        
@@ -146,7 +146,7 @@ Last-Update: 2014-03-03
        ptr += 2;
  
        /* ToDS   FromDS   Addr1   Addr2  Addr3   Addr4
-@@ -910,10 +942,10 @@
+@@ -937,10 +969,10 @@
           1      0        BSSID   SA     DA      N/A
           1      1        RA      TA     DA      SA  (wireless bridge) */
  
@@ -161,7 +161,7 @@ Last-Update: 2014-03-03
  
        if(toDS) {
  	dstMAC = macAddr3;
-@@ -941,6 +973,7 @@
+@@ -968,6 +1000,7 @@
        if(rxMAC) sf_log(sample,"rxMAC %02x%02x%02x%02x%02x%02x\n", rxMAC[0], rxMAC[1], rxMAC[2], rxMAC[3], rxMAC[4], rxMAC[5]);
      }
    }
@@ -169,7 +169,7 @@ Last-Update: 2014-03-03
  }
  
  /*_________________---------------------------__________________
-@@ -1385,7 +1418,7 @@
+@@ -1412,7 +1445,7 @@
  {
  
  #ifdef SPOOFSOURCE
@@ -178,7 +178,7 @@ Last-Update: 2014-03-03
  #endif
  
    {
-@@ -2334,6 +2367,9 @@
+@@ -2365,6 +2398,9 @@
    uint64_t req_bytes;
    uint64_t resp_bytes;
  
@@ -188,7 +188,7 @@ Last-Update: 2014-03-03
    sf_log(sample,"flowSampleType http\n");
    method = sf_log_next32(sample, "http_method");
    protocol = sf_log_next32(sample, "http_protocol");
-@@ -3764,7 +3800,7 @@
+@@ -3794,7 +3830,7 @@
      SFForwardingTarget *tgt = sfConfig.forwardingTargets;
      for( ; tgt != NULL; tgt = tgt->nxt) {
        int bytesSent;
@@ -197,7 +197,7 @@ Last-Update: 2014-03-03
  			     (const char *)sample->rawSample,
  			     sample->rawSampleLen,
  			     0,
-@@ -3804,6 +3840,9 @@
+@@ -3834,6 +3870,9 @@
  {
    int soc;
    struct sockaddr_in myaddr_in;
@@ -207,7 +207,7 @@ Last-Update: 2014-03-03
  
    /* Create socket */
    memset((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
-@@ -3818,7 +3857,7 @@
+@@ -3848,7 +3887,7 @@
  
  #ifndef WIN32
    /* make socket non-blocking */
@@ -216,7 +216,7 @@ Last-Update: 2014-03-03
    save_fd |= O_NONBLOCK;
    fcntl(soc, F_SETFL, save_fd);
  #endif /* WIN32 */
-@@ -3840,6 +3879,9 @@
+@@ -3870,6 +3909,9 @@
  {
    int soc;
    struct sockaddr_in6 myaddr_in6;
@@ -226,7 +226,7 @@ Last-Update: 2014-03-03
  
    /* Create socket */
    memset((char *)&myaddr_in6, 0, sizeof(struct sockaddr_in6));
-@@ -3854,7 +3896,7 @@
+@@ -3884,7 +3926,7 @@
  
  #ifndef WIN32
    /* make socket non-blocking */
@@ -235,7 +235,7 @@ Last-Update: 2014-03-03
    save_fd |= O_NONBLOCK;
    fcntl(soc, F_SETFL, save_fd);
  #endif /* WIN32 */
-@@ -3891,7 +3933,9 @@
+@@ -3921,7 +3963,9 @@
  static void readPacket(int soc)
  {
    struct sockaddr_in6 peer;
@@ -246,7 +246,7 @@ Last-Update: 2014-03-03
  #define MAX_PKT_SIZ 65536
    char buf[MAX_PKT_SIZ];
    alen = sizeof(peer);
-@@ -3901,10 +3945,9 @@
+@@ -3931,10 +3975,9 @@
      fprintf(ERROUT, "recvfrom() failed, %s\n", strerror(errno));
      return;
    }
@@ -258,7 +258,7 @@ Last-Update: 2014-03-03
    if(alen == sizeof(struct sockaddr_in)) {
      struct sockaddr_in *peer4 = (struct sockaddr_in *)&peer;
      sample.sourceIP.type = SFLADDRESSTYPE_IP_V4;
-@@ -3981,7 +4024,7 @@
+@@ -4011,7 +4054,7 @@
    }
  
    /* now we're just looking for IP */
@@ -267,7 +267,7 @@ Last-Update: 2014-03-03
    
    /* peek for IPX */
    if(type_len == 0x0200 || type_len == 0x0201 || type_len == 0x0600) {
-@@ -4031,7 +4074,7 @@
+@@ -4061,7 +4104,7 @@
  
    if(type_len == 0x0800) {
      /* IPV4 */
@@ -276,7 +276,7 @@ Last-Update: 2014-03-03
      /* look at first byte of header.... */
      /*  ___________________________ */
      /* |   version   |    hdrlen   | */
-@@ -4280,7 +4323,8 @@
+@@ -4310,7 +4353,8 @@
  
  static void process_command_line(int argc, char *argv[])
  {
@@ -286,7 +286,7 @@ Last-Update: 2014-03-03
    int i;
    int plus,minus;
    size_t len_str;
-@@ -4301,7 +4345,7 @@
+@@ -4331,7 +4375,7 @@
      plus = (argv[arg][0] == '+');
      minus = (argv[arg][0] == '-');
      if(plus == NO && minus == NO) { instructions(*argv); exit(1); }
