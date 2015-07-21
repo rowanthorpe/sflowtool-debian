@@ -219,6 +219,23 @@ packet_size
 IP_size
 sampling_rate
 
+
+grep-friendly output
+====================
+Adding the "-g" option causes sflowtool to include contextual information on every
+line of output.  The fields are:
+
+agentIP
+agentSubId
+datasource_sequenceNo
+datasource_class
+datasource_index
+sampletype_tag
+elementtype_tag
+
+For example,  this makes it much easier to extract a particular counter for each agent,
+accumulate the deltas, and stream it to a time-series database.
+
 ---
 ----------------------------------------
 Neil McKee (mailto:neil.mckee@inmon.com)
