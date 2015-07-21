@@ -188,7 +188,7 @@ Last-Update: 2014-03-03
    sf_log(sample,"flowSampleType http\n");
    method = sf_log_next32(sample, "http_method");
    protocol = sf_log_next32(sample, "http_protocol");
-@@ -3801,7 +3837,7 @@
+@@ -3953,7 +3989,7 @@
      SFForwardingTarget *tgt = sfConfig.forwardingTargets;
      for( ; tgt != NULL; tgt = tgt->nxt) {
        int bytesSent;
@@ -197,7 +197,7 @@ Last-Update: 2014-03-03
  			     (const char *)sample->rawSample,
  			     sample->rawSampleLen,
  			     0,
-@@ -3841,6 +3877,9 @@
+@@ -3993,6 +4029,9 @@
  {
    int soc;
    struct sockaddr_in myaddr_in;
@@ -207,7 +207,7 @@ Last-Update: 2014-03-03
  
    /* Create socket */
    memset((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
-@@ -3855,7 +3894,7 @@
+@@ -4007,7 +4046,7 @@
  
  #ifndef WIN32
    /* make socket non-blocking */
@@ -216,7 +216,7 @@ Last-Update: 2014-03-03
    save_fd |= O_NONBLOCK;
    fcntl(soc, F_SETFL, save_fd);
  #endif /* WIN32 */
-@@ -3877,6 +3916,9 @@
+@@ -4029,6 +4068,9 @@
  {
    int soc;
    struct sockaddr_in6 myaddr_in6;
@@ -226,7 +226,7 @@ Last-Update: 2014-03-03
  
    /* Create socket */
    memset((char *)&myaddr_in6, 0, sizeof(struct sockaddr_in6));
-@@ -3891,7 +3933,7 @@
+@@ -4043,7 +4085,7 @@
  
  #ifndef WIN32
    /* make socket non-blocking */
@@ -235,7 +235,7 @@ Last-Update: 2014-03-03
    save_fd |= O_NONBLOCK;
    fcntl(soc, F_SETFL, save_fd);
  #endif /* WIN32 */
-@@ -3928,7 +3970,9 @@
+@@ -4080,7 +4122,9 @@
  static void readPacket(int soc)
  {
    struct sockaddr_in6 peer;
@@ -246,7 +246,7 @@ Last-Update: 2014-03-03
  #define MAX_PKT_SIZ 65536
    char buf[MAX_PKT_SIZ];
    alen = sizeof(peer);
-@@ -3938,10 +3982,9 @@
+@@ -4090,10 +4134,9 @@
      fprintf(ERROUT, "recvfrom() failed, %s\n", strerror(errno));
      return;
    }
@@ -258,7 +258,7 @@ Last-Update: 2014-03-03
    if(alen == sizeof(struct sockaddr_in)) {
      struct sockaddr_in *peer4 = (struct sockaddr_in *)&peer;
      sample.sourceIP.type = SFLADDRESSTYPE_IP_V4;
-@@ -4018,7 +4061,7 @@
+@@ -4170,7 +4213,7 @@
    }
  
    /* now we're just looking for IP */
@@ -267,7 +267,7 @@ Last-Update: 2014-03-03
    
    /* peek for IPX */
    if(type_len == 0x0200 || type_len == 0x0201 || type_len == 0x0600) {
-@@ -4068,7 +4111,7 @@
+@@ -4220,7 +4263,7 @@
  
    if(type_len == 0x0800) {
      /* IPV4 */
@@ -276,7 +276,7 @@ Last-Update: 2014-03-03
      /* look at first byte of header.... */
      /*  ___________________________ */
      /* |   version   |    hdrlen   | */
-@@ -4317,7 +4360,8 @@
+@@ -4469,7 +4512,8 @@
  
  static void process_command_line(int argc, char *argv[])
  {
@@ -286,7 +286,7 @@ Last-Update: 2014-03-03
    int i;
    int plus,minus;
    size_t len_str;
-@@ -4338,7 +4382,7 @@
+@@ -4490,7 +4534,7 @@
      plus = (argv[arg][0] == '+');
      minus = (argv[arg][0] == '-');
      if(plus == NO && minus == NO) { instructions(*argv); exit(1); }
@@ -384,12 +384,12 @@ Last-Update: 2014-03-03
    uint32_t machine_type; /* enum SFLMachine_type */
    uint32_t os_name;      /* enum SFLOS_name */
    SFLString os_release;  /* max len 32 bytes */
-@@ -1314,7 +1315,7 @@
-   SFLCOUNTERS_MEMCACHE2     = 2204, /* memcached */
+@@ -1458,7 +1459,7 @@
    SFLCOUNTERS_VDI           = 2205,
    SFLCOUNTERS_APP_WORKERS   = 2206,
--  SFLCOUNTERS_HOST_GPU_NVML = (5703 << 12) + 1, /* = 23359489 */
-+  SFLCOUNTERS_HOST_GPU_NVML = (5703 << 12) + 1 /* = 23359489 */
+   SFLCOUNTERS_HOST_GPU_NVML = (5703 << 12) + 1, /* = 23359489 */
+-  SFLCOUNTERS_BCM_TABLES    = (4413 << 12) + 3,
++  SFLCOUNTERS_BCM_TABLES    = (4413 << 12) + 3
  };
  
  typedef union _SFLCounters_type {
