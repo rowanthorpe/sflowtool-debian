@@ -3131,7 +3131,7 @@ static void readCounters_host_parent(SFSample *sample)
   -----------------___________________________------------------
 */
 
-static void readCounters_host_cpu(SFSample *sample)
+static void readCounters_host_cpu(SFSample *sample, uint32_t length)
 {
   sf_log_nextFloat(sample, "cpu_load_one");
   sf_log_nextFloat(sample, "cpu_load_five");
@@ -3150,6 +3150,12 @@ static void readCounters_host_cpu(SFSample *sample)
   sf_log_next32(sample, "cpu_sintr");
   sf_log_next32(sample, "cpuinterrupts");
   sf_log_next32(sample, "cpu_contexts");
+  if(length > 68) {
+    // these three fields were added in December 2014
+    sf_log_next32(sample, "cpu_steal");
+    sf_log_next32(sample, "cpu_guest");
+    sf_log_next32(sample, "cpu_guest_nice");
+  }
 }
  
 /*_________________---------------------------__________________
@@ -3674,7 +3680,7 @@ static void readCountersSample(SFSample *sample, int expanded)
       case SFLCOUNTERS_HOST_HID: readCounters_host_hid(sample); break;
       case SFLCOUNTERS_ADAPTORS: readCounters_adaptors(sample); break;
       case SFLCOUNTERS_HOST_PAR: readCounters_host_parent(sample); break;
-      case SFLCOUNTERS_HOST_CPU: readCounters_host_cpu(sample); break;
+      case SFLCOUNTERS_HOST_CPU: readCounters_host_cpu(sample, length); break;
       case SFLCOUNTERS_HOST_MEM: readCounters_host_mem(sample); break;
       case SFLCOUNTERS_HOST_DSK: readCounters_host_dsk(sample); break;
       case SFLCOUNTERS_HOST_NIO: readCounters_host_nio(sample); break;

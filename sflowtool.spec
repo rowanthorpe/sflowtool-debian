@@ -1,6 +1,6 @@
 Summary: tool to ascii-print or forward sFlow datagrams
 Name: sflowtool
-Version: 3.26
+Version: 3.34
 Release: 1%{?dist}
 License: http://www.inmon.com/technology/sflowlicense.txt
 Group: Productivity/Networking/Diagnostic
