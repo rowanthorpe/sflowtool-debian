@@ -2448,8 +2448,8 @@ static void readFlowSample_APP(SFSample *sample)
   }
   sf_log_next64(sample, "request_bytes");
   sf_log_next64(sample, "response_bytes");
-  sf_log(sample,"status %s\n", SFL_APP_STATUS_names[getData32(sample)]);
   sf_log_next32(sample, "duration_uS");
+  sf_log(sample,"status %s\n", SFL_APP_STATUS_names[getData32(sample)]);
 }
 
 
@@ -3757,6 +3757,7 @@ static void readSFlowDatagram(SFSample *sample)
 	SFABORT(sample, SF_ABORT_EOS);
       }
       /* just read the tag, then call the approriate decode fn */
+      sample->elementType = 0;
       sample->sampleType = getData32(sample);
       sf_log(sample,"startSample ----------------------\n");
       sf_log(sample,"sampleType_tag %s\n", printTag(sample->sampleType, buf));

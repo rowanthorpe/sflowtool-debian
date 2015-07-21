@@ -1,3 +1,5 @@
+Dec-01-2014:
+       3.33: - bugfix: app-sample status and duration_uS fields were reversed
 May-27-2014:
        3.32 - fix UUID printing (bug introduced in 3.31)
             - move compiler pragmas outside function boundry (to avoid compile errors with older compilers)
