@@ -1,3 +1,13 @@
+sflowtool (3.33-1) unstable; urgency=medium
+
+  * Imported Upstream version 3.33
+  * Refresh fix-strdup-mem-leak.patch
+  * Refresh strict-ansi-types-coercions-syntax.patch
+  * Refresh downgrade-automake-dep-for-clean-build-on-wheezy.patch
+  * Version dependency bump in control file
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Tue, 21 Jul 2015 18:37:47 +0300
+
 sflowtool (3.32-1) unstable; urgency=medium
 
   * Imported Upstream version 3.32
