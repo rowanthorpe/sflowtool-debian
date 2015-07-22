@@ -33,7 +33,7 @@ sflowtool for Debian
    - bump version-dependency in debian/control
    - optionally bump debian-standards version in debian/control if there's a
      new version
-   - gbp dch
+   - gbp dch --distribution=XXXX
    - BUILDER=pbuilder gbp buildpackage --git-dist=XXXX
    - lintian -E -i -I --pedantic ../sflowtool_X.XX-Y_amd64.changes
    - BUILDER=pbuilder gbp buildpackage --git-tag --git-dist=XXXX
