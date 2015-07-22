@@ -1,3 +1,16 @@
+sflowtool (3.35-2) unstable; urgency=medium
+
+  * Maintenance-notes reminder to specify dist when building
+  * Maintenance-notes reminder about distribution in gbp-dch
+  * Remove Replaces: in debian/control (only for replacing other pkgs)
+  * Overhaul sflowtool-forwarder.{init,default},add postinst
+  * Fix maintenance-note about building specific dist
+  * Add manual-compile leftover files to gitignore
+  * Refresh strict-ansi-types-coercions-syntax.patch
+  * Fix/uncomment verbose compile-flags setting
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Wed, 22 Jul 2015 18:21:20 +0300
+
 sflowtool (3.35-1) unstable; urgency=medium
 
   * Imported Upstream version 3.35
