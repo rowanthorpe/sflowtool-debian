@@ -9,7 +9,7 @@ Description: General types, syntax cleanup and adding explicit coercions
  functional faults were consequently discovered, validating the effort...
 Forwarded: yes
 Author: Rowan Thorpe <rowan@rowanthorpe.com>
-Last-Update: 2014-03-03
+Last-Update: 2015-07-22
 --- a/src/sflowtool.c
 +++ b/src/sflowtool.c
 @@ -11,6 +11,7 @@
@@ -29,6 +29,37 @@ Last-Update: 2014-03-03
    uint32_t stripped;
  
    /* header decode */
+@@ -492,7 +493,7 @@
+ 
+ static uint8_t bin2hex(int nib) { return (nib < 10) ? ('0' + nib) : ('A' - 10 + nib); }
+ 
+-int printHex(const uint8_t *a, int len, uint8_t *buf, int bufLen, int marker, int bytesPerOutputLine)
++int printHex(const uint8_t *a, int len, char *buf, int bufLen, int marker, int bytesPerOutputLine)
+ {
+   int b = 0, i = 0;
+   for(; i < len; i++) {
+@@ -522,7 +523,7 @@
+   -----------------___________________________------------------
+ */
+   
+-  int printUUID(const u_char *a, u_char *buf, int bufLen)
++  int printUUID(const uint8_t *a, char *buf, int bufLen)
+   {
+     int i, b = 0;
+     b += printHex(a, 4, buf, bufLen, 0, 100);
+@@ -535,10 +536,10 @@
+     buf[b++] = '-';
+     b += printHex(a + 10, 6, buf + b, bufLen - b, 0, 100);
+     
+-    // should really be lowercase hex - fix that here
++    /* should really be lowercase hex - fix that here */
+     for(i = 0; i < b; i++) buf[i] = tolower(buf[i]);
+ 
+-    // add NUL termination
++    /* add NUL termination */
+     buf[b] = '\0';
+ 
+     return b;
 @@ -554,7 +555,7 @@
    register char c, *r = in, *w = out;
    int maxlen = (strlen(in) * 3) + 1;
@@ -38,6 +69,15 @@ Last-Update: 2014-03-03
      if(isalnum(c)) *w++ = c;
      else if(isspace(c)) *w++ = '+';
      else {
+@@ -721,7 +722,7 @@
+   uint32_t markOffset = (uint8_t *)sample->datap - sample->rawSample;
+   if(errm) msg = errm;
+   if(hexdump) {
+-    printHex(sample->rawSample, sample->rawSampleLen, (uint8_t *)scratch, 6000, markOffset, 16);
++    printHex(sample->rawSample, sample->rawSampleLen, scratch, 6000, markOffset, 16);
+     hex = scratch;
+   }
+   fprintf(ERROUT, "%s (source IP = %s) %s\n",
 @@ -852,7 +853,7 @@
  
    if(type_len == 0x0800) {
@@ -178,6 +218,15 @@ Last-Update: 2014-03-03
  #endif
  
    {
+@@ -2131,7 +2164,7 @@
+   skipBytes(sample, sample->headerLen);
+   {
+     char scratch[2000];
+-    printHex(sample->header, sample->headerLen, (uint8_t *)scratch, 2000, 0, 2000);
++    printHex(sample->header, sample->headerLen, scratch, 2000, 0, 2000);
+     sf_log(sample,"headerBytes %s\n", scratch);
+   }
+   
 @@ -2365,6 +2398,9 @@
    uint64_t req_bytes;
    uint64_t resp_bytes;
@@ -188,7 +237,24 @@ Last-Update: 2014-03-03
    sf_log(sample,"flowSampleType http\n");
    method = sf_log_next32(sample, "http_method");
    protocol = sf_log_next32(sample, "http_protocol");
-@@ -3953,7 +3989,7 @@
+@@ -3071,7 +3107,6 @@
+ 
+ static void readCounters_host_hid(SFSample *sample)
+ {
+-  uint32_t i;
+   uint8_t *uuid;
+   char hostname[SFL_MAX_HOSTNAME_LEN+1];
+   char os_release[SFL_MAX_OSRELEASE_LEN+1];
+@@ -3151,7 +3186,7 @@
+   sf_log_next32(sample, "cpuinterrupts");
+   sf_log_next32(sample, "cpu_contexts");
+   if(length > 68) {
+-    // these three fields were added in December 2014
++    /* these three fields were added in December 2014 */
+     sf_log_next32(sample, "cpu_steal");
+     sf_log_next32(sample, "cpu_guest");
+     sf_log_next32(sample, "cpu_guest_nice");
+@@ -3953,7 +3988,7 @@
      SFForwardingTarget *tgt = sfConfig.forwardingTargets;
      for( ; tgt != NULL; tgt = tgt->nxt) {
        int bytesSent;
@@ -197,7 +263,7 @@ Last-Update: 2014-03-03
  			     (const char *)sample->rawSample,
  			     sample->rawSampleLen,
  			     0,
-@@ -3993,6 +4029,9 @@
+@@ -3993,6 +4028,9 @@
  {
    int soc;
    struct sockaddr_in myaddr_in;
@@ -207,7 +273,7 @@ Last-Update: 2014-03-03
  
    /* Create socket */
    memset((char *)&myaddr_in, 0, sizeof(struct sockaddr_in));
-@@ -4007,7 +4046,7 @@
+@@ -4007,7 +4045,7 @@
  
  #ifndef WIN32
    /* make socket non-blocking */
@@ -216,7 +282,7 @@ Last-Update: 2014-03-03
    save_fd |= O_NONBLOCK;
    fcntl(soc, F_SETFL, save_fd);
  #endif /* WIN32 */
-@@ -4029,6 +4068,9 @@
+@@ -4029,6 +4067,9 @@
  {
    int soc;
    struct sockaddr_in6 myaddr_in6;
@@ -226,7 +292,7 @@ Last-Update: 2014-03-03
  
    /* Create socket */
    memset((char *)&myaddr_in6, 0, sizeof(struct sockaddr_in6));
-@@ -4043,7 +4085,7 @@
+@@ -4043,7 +4084,7 @@
  
  #ifndef WIN32
    /* make socket non-blocking */
@@ -235,7 +301,7 @@ Last-Update: 2014-03-03
    save_fd |= O_NONBLOCK;
    fcntl(soc, F_SETFL, save_fd);
  #endif /* WIN32 */
-@@ -4080,7 +4122,9 @@
+@@ -4080,7 +4121,9 @@
  static void readPacket(int soc)
  {
    struct sockaddr_in6 peer;
@@ -246,19 +312,29 @@ Last-Update: 2014-03-03
  #define MAX_PKT_SIZ 65536
    char buf[MAX_PKT_SIZ];
    alen = sizeof(peer);
-@@ -4090,10 +4134,9 @@
+@@ -4090,7 +4133,6 @@
      fprintf(ERROUT, "recvfrom() failed, %s\n", strerror(errno));
      return;
    }
 -  SFSample sample;
    memset(&sample, 0, sizeof(sample));
    sample.rawSample = (uint8_t *)buf;
--  sample.rawSampleLen = cc;
-+  sample.rawSampleLen = (uint8_t)cc;
-   if(alen == sizeof(struct sockaddr_in)) {
-     struct sockaddr_in *peer4 = (struct sockaddr_in *)&peer;
-     sample.sourceIP.type = SFLADDRESSTYPE_IP_V4;
-@@ -4170,7 +4213,7 @@
+   sample.rawSampleLen = cc;
+@@ -4135,10 +4177,12 @@
+   switch(sfConfig.readPcapHdr.linktype) {
+   case DLT_LINUX_SLL:
+     {
++      /*
+       uint16_t packet_type = (ptr[0] << 8) + ptr[1];
+       uint16_t arphrd_type = (ptr[2] << 8) + ptr[3];
+       uint16_t lladdr_len = (ptr[4] << 8) + ptr[5];
+-      /* but lladdr field is always 8 bytes regardless */
++      */
++      /* above fields not yet used variably anyway */
+       ptr += 6 + 8;
+       type_len = (ptr[0] << 8) + ptr[1];
+       ptr += 2;
+@@ -4170,7 +4214,7 @@
    }
  
    /* now we're just looking for IP */
@@ -267,7 +343,7 @@ Last-Update: 2014-03-03
    
    /* peek for IPX */
    if(type_len == 0x0200 || type_len == 0x0201 || type_len == 0x0600) {
-@@ -4220,7 +4263,7 @@
+@@ -4220,7 +4264,7 @@
  
    if(type_len == 0x0800) {
      /* IPV4 */
@@ -276,7 +352,7 @@ Last-Update: 2014-03-03
      /* look at first byte of header.... */
      /*  ___________________________ */
      /* |   version   |    hdrlen   | */
-@@ -4469,7 +4512,8 @@
+@@ -4469,7 +4513,8 @@
  
  static void process_command_line(int argc, char *argv[])
  {
@@ -286,7 +362,7 @@ Last-Update: 2014-03-03
    int i;
    int plus,minus;
    size_t len_str;
-@@ -4490,7 +4534,7 @@
+@@ -4490,7 +4535,7 @@
      plus = (argv[arg][0] == '+');
      minus = (argv[arg][0] == '-');
      if(plus == NO && minus == NO) { instructions(*argv); exit(1); }
@@ -384,7 +460,17 @@ Last-Update: 2014-03-03
    uint32_t machine_type; /* enum SFLMachine_type */
    uint32_t os_name;      /* enum SFLOS_name */
    SFLString os_release;  /* max len 32 bytes */
-@@ -1458,7 +1459,7 @@
+@@ -1111,7 +1112,9 @@
+   uint32_t bcm_acl_egress_slices_max;
+ } SFLBCM_tables;
+ 
++  /*
+   ///////////// TCP/UDP/ICMP from MIB-II ///////////////////////
++  */
+ 
+   /* IP Group - see MIB-II */
+   /* opaque = counter_data; enterprise = 0; format = 2007 */
+@@ -1458,7 +1461,7 @@
    SFLCOUNTERS_VDI           = 2205,
    SFLCOUNTERS_APP_WORKERS   = 2206,
    SFLCOUNTERS_HOST_GPU_NVML = (5703 << 12) + 1, /* = 23359489 */
