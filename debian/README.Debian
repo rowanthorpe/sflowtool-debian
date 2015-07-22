@@ -30,7 +30,6 @@ sflowtool for Debian
        - dquilt refresh (or delete the patch, etc)
      + optionally update docbook xml (then export different formats) if there
        is changed functionality requiring changed documentation
-   - bump version-dependency in debian/control
    - optionally bump debian-standards version in debian/control if there's a
      new version
    - gbp dch --distribution=XXXX
