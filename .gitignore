@@ -4,3 +4,13 @@
 /debian/files
 /debian/sflowtool/
 /.pc/
+/Makefile
+/autom4te.cache
+/config.h
+/config.log
+/config.status
+/src/.deps
+/src/Makefile
+/stamp-h1
+/src/sflowtool
+/src/sflowtool.o
