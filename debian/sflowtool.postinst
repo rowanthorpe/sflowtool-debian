@@ -1,0 +1,27 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+        if ! id sflowtool >/dev/null 2>&1; then
+                adduser --system --group --gecos 'Sflowtool forwarder' \
+                        --no-create-home \
+                        --home /var/lib/sflowtool-forwarder sflowtool >/dev/null
+        fi
+        if ! dpkg-statoverride --list /var/run/sflowtool-forwarder; then
+                test -d /var/run/sflowtool-forwarder || mkdir /var/run/sflowtool-forwarder
+                chown sflowtool:sflowtool /var/run/sflowtool-forwarder
+                chmod 755 /var/run/sflowtool-forwarder
+        fi
+        if ! dpkg-statoverride --list /var/lib/sflowtool-forwarder; then
+                test -d /var/lib/sflowtool-forwarder || mkdir /var/lib/sflowtool-forwarder
+                chown sflowtool:sflowtool /var/lib/sflowtool-forwarder
+                chmod 750 /var/lib/sflowtool-forwarder
+        fi
+        ;;
+    *)
+        ;;
+esac
+
+#DEBHELPER#

@@ -10,8 +10,15 @@
 # starting unless RUN_DAEMON is explicitly set, after editing
 # DAEMON_ARGS below (which must have a setting or the daemon will still not
 # start).
-RUN_DAEMON="no"
+RUN_DAEMON='no'
 
-# Args which are passed to the Daemon.
-#DAEMON_ARGS="-k -p 800 +4 -f 127.0.0.1/801 -f [::1]/801 -f 127.0.0.1/802 -f [::1]/802"
-DAEMON_ARGS=""
+# Self-explanatory settings
+USER='sflowtool'  # set to root for ports below 1024
+GROUP='sflowtool' # set to root for ports below 1024
+SILENT='no'
+
+# Args which are passed to the Daemon
+#DAEMON_ARGS='-k -p 10000 +4 -f 127.0.0.1/10001 -f [::1]/10001 -f 127.0.0.1/10002 -f [::1]/10002'
+#...or this version requires root user:
+#DAEMON_ARGS='-k -p 800 +4 -f 127.0.0.1/801 -f [::1]/801 -f 127.0.0.1/802 -f [::1]/802'
+DAEMON_ARGS=''
