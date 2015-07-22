@@ -34,8 +34,8 @@ sflowtool for Debian
    - optionally bump debian-standards version in debian/control if there's a
      new version
    - gbp dch
-   - BUILDER=pbuilder gbp buildpackage
+   - BUILDER=pbuilder gbp buildpackage --git-dist=XXXX
    - lintian -E -i -I --pedantic ../sflowtool_X.XX-Y_amd64.changes
-   - BUILDER=pbuilder gbp buildpackage --git-tag
+   - BUILDER=pbuilder gbp buildpackage --git-tag --git-dist=XXXX
 
  -- Rowan Thorpe <rowan@rowanthorpe.com>, Tue, 21 Jul 2015 16:34:25 +0300
