@@ -1,0 +1,57 @@
+Description: Make v6-bind explicitly v6only to avoid singlestack vs. dualstack issues
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2015-07-23
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -4074,6 +4074,9 @@
+ static int openInputUDP6Socket(uint16_t port)
+ {
+   int soc;
++#ifdef IPV6_V6ONLY
++  int v6Only;
++#endif
+   struct sockaddr_in6 myaddr_in6;
+ #ifndef WIN32
+   int save_fd;
+@@ -4097,6 +4100,28 @@
+   fcntl(soc, F_SETFL, save_fd);
+ #endif /* WIN32 */
+ 
++  /*
++   Separate bind for v4 will fail on platforms already in dualstack mode:
++
++    http://www.gogo6.com/group/v6insoftwaredevelopment/forum/topics/platform-differences-with-v4v6
++
++   Force single-stack v6-bind on systems which handle dual-stack v6-with-v4, so that
++   this doesn't conflict with the subsequent v4 socket-open when both are requested.
++   This will open separate v4 and v6 sockets which is not as optimal as just opening
++   one dual-stack socket where possible, but is a much simpler way to handle all
++   combinations of:
++
++    - dual-stack platform(s)
++    - dual-stack platform(s) configured for single-stack
++    - single-stack platform(s)
++
++   without extensive OS-sniffing and heuristics.
++  */
++#ifdef IPV6_V6ONLY
++  v6Only = 1;
++  setsockopt(soc, IPPROTO_IPV6, IPV6_V6ONLY, &v6Only, sizeof(v6Only));
++#endif
++
+   /* Bind the socket */
+   if(bind(soc, (struct sockaddr *)&myaddr_in6, sizeof(struct sockaddr_in6)) == -1) {
+     fprintf(ERROUT, "v6 bind() failed, port = %d : %s\n", port, strerror(errno));
+@@ -4677,11 +4702,6 @@
+     free(sfConfig.readPcapFileName);
+   }
+   else {
+-    /* open the input socket -- for now it's either a v4 or v6 socket, but in future
+-       we may allow both to be opened so that platforms that refuse to allow v4 packets
+-       to be received on a v6 socket can still get both. I think for that to really work,
+-       however,  we will probably need to allow the bind() to be on a particular v4 or v6
+-       address.  Otherwise it seems likely that we will get a clash(?) */
+     if(sfConfig.listen6) {
+       soc6 = openInputUDP6Socket(sfConfig.sFlowInputPort);
+     }
