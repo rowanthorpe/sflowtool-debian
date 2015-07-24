@@ -1,0 +1,28 @@
+Description: Use unsigned short instead of u_short
+ u_short is unrecognised by my compiler, but "unsigned short"
+ works fine, so this replaces it.
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2014-03-03
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -1311,8 +1311,8 @@
+ static uint16_t in_checksum(uint16_t *addr, int len)
+ {
+   int nleft = len;
+-  u_short *w = addr;
+-  u_short answer;
++  unsigned short *w = addr;
++  unsigned short answer;
+   int sum = 0;
+ 
+   while (nleft > 1)  {
+@@ -1400,7 +1400,7 @@
+       uint32_t dst;
+       uint8_t zero;
+       uint8_t proto;
+-      u_short len;
++      unsigned short len;
+     } h, saved;
+ 
+     h.src = sfConfig.sendPkt.ip.saddr;
