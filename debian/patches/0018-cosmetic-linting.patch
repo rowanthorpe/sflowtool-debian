@@ -1,0 +1,669 @@
+Description: Cosmetic linting (whitespace, typos in comments)
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2015-07-24
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -23,7 +23,7 @@
+ #include <setjmp.h>
+ #include <ctype.h>
+ 
+-#ifdef WIN32 
++#ifdef WIN32
+ #else
+ #include <unistd.h>
+ #include <netdb.h>
+@@ -336,7 +336,7 @@
+    */
+   uint32_t dst_peer_as;
+   uint32_t dst_as;
+-  
++
+   uint32_t communities_len;
+   uint32_t *communities;
+   uint32_t localpref;
+@@ -483,7 +483,7 @@
+ 	   sample->ds_index,
+ 	   printTag(sample->sampleType, tag1),
+ 	   printTag(sample->elementType, tag2));
+-  }   
++  }
+   if(sfConfig.outputFormat == SFLFMT_FULL
+      || sfConfig.outputFormat == SFLFMT_SCRIPT) {
+     va_list args;
+@@ -811,7 +811,7 @@
+ 
+   /* now we're just looking for IP */
+   if(sample->headerLen < NFT_MIN_SIZ) return; /* not enough for an IPv4 header */
+-  
++
+   /* peek for IPX */
+   if(type_len == 0x0200 || type_len == 0x0201 || type_len == 0x0600) {
+ #define IPX_HDR_LEN 30
+@@ -823,8 +823,8 @@
+        ipxLen <= (IPX_HDR_LEN + IPX_MAX_DATA))
+       /* we don't do anything with IPX here */
+       return;
+-  } 
+-  
++  }
++
+   if(type_len <= NFT_MAX_8023_LEN) {
+     /* assume 802.3+802.2 header */
+     /* check for SNAP */
+@@ -961,7 +961,7 @@
+ 
+   case 2: /* data */
+     {
+-      
++
+       macAddr1 = ptr;
+       ptr += 6;
+       macAddr2 = ptr;
+@@ -1126,7 +1126,7 @@
+ 
+   if(sample->gotIPV6) {
+     uint8_t *ptr = sample->header + sample->offsetToIPV6;
+-    
++
+     /* check the version */
+     {
+       int ipVersion = (*ptr >> 4);
+@@ -1188,7 +1188,7 @@
+       ptr += skip;
+       if(ptr > end) return; /* ran off the end of the header */
+     }
+-    
++
+     /* now that we have eliminated the extension headers, nextHeader should have what we want to
+        remember as the ip protocol... */
+     sample->dcd_ipProtocol = nextHeader;
+@@ -1336,7 +1336,7 @@
+ static void openNetFlowSocket_spoof()
+ {
+   int on;
+-  
++
+   if((sfConfig.netFlowOutputSocket = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) == -1) {
+     fprintf(ERROUT, "netflow output raw socket open failed\n");
+     exit(-11);
+@@ -1351,7 +1351,7 @@
+     fprintf(ERROUT, "setsockopt( SO_REUSEADDR ) failed\n");
+     exit(-14);
+   }
+-  
++
+   memset(&sfConfig.sendPkt, 0, sizeof(sfConfig.sendPkt));
+   sfConfig.sendPkt.ip.version_and_headerLen = 0x45;
+   sfConfig.sendPkt.ip.protocol = IPPROTO_UDP;
+@@ -1402,7 +1402,7 @@
+       uint8_t proto;
+       u_short len;
+     } h, saved;
+-    
++
+     h.src = sfConfig.sendPkt.ip.saddr;
+     h.dst = sfConfig.sendPkt.ip.daddr;
+     h.zero = 0;
+@@ -1422,7 +1422,7 @@
+     if (sfConfig.sendPkt.udp.uh_sum == 0) sfConfig.sendPkt.udp.uh_sum = 0xffff;
+     /* copy the save bytes back again */
+     memcpy(ptr, &saved, sizeof(struct udpmagichdr));
+-    
++
+     { /* now send the packet */
+       int bytesSent;
+       struct sockaddr dest;
+@@ -1461,8 +1461,8 @@
+     memset((char *)&addr,0,sizeof(addr));
+     addr.sin_family = AF_INET;
+     addr.sin_port = ntohs(sfConfig.netFlowOutputPort);
+-    addr.sin_addr.s_addr = sfConfig.netFlowOutputIP.s_addr; 
+-    
++    addr.sin_addr.s_addr = sfConfig.netFlowOutputIP.s_addr;
++
+     /* open an ordinary UDP socket */
+     if((sfConfig.netFlowOutputSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+       fprintf(ERROUT, "netflow output socket open failed\n");
+@@ -1492,12 +1492,12 @@
+   if(sample->ip_fragmentOffset > 0) return;
+   /* count the bytes from the start of IP header, with the exception that
+      for udp packets we use the udp_pduLen. This is because the udp_pduLen
+-     can be up tp 65535 bytes, which causes fragmentation at the IP layer.
++     can be up to 65535 bytes, which causes fragmentation at the IP layer.
+      Since the sampled fragments are discarded, we have to use this field
+      to get the total bytes estimates right. */
+   if(sample->udp_pduLen > 0) bytes = sample->udp_pduLen;
+   else bytes = sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4;
+-  
++
+   memset(&pkt, 0, sizeof(pkt));
+   pkt.hdr.version = htons(5);
+   pkt.hdr.count = htons(1);
+@@ -1523,7 +1523,7 @@
+     pkt.flow.frames = htonl(1);
+     pkt.flow.bytes = htonl(bytes);
+   }
+-    
++
+   pkt.flow.firstTime = pkt.hdr.sysUpTime;  /* set the start and end time to be now (in milliseconds since last boot) */
+   pkt.flow.lastTime =  pkt.hdr.sysUpTime;
+   pkt.flow.srcPort = htons((uint16_t)sample->dcd_sport);
+@@ -1533,14 +1533,14 @@
+   pkt.flow.ipTos = sample->dcd_ipTos;
+ 
+   if(sfConfig.netFlowPeerAS) {
+-    pkt.flow.srcAS = htons((uint16_t)sample->src_peer_as);   
+-    pkt.flow.dstAS = htons((uint16_t)sample->dst_peer_as);   
++    pkt.flow.srcAS = htons((uint16_t)sample->src_peer_as);
++    pkt.flow.dstAS = htons((uint16_t)sample->dst_peer_as);
+   }
+   else {
+-    pkt.flow.srcAS = htons((uint16_t)sample->src_as);   
+-    pkt.flow.dstAS = htons((uint16_t)sample->dst_as);   
++    pkt.flow.srcAS = htons((uint16_t)sample->src_as);
++    pkt.flow.dstAS = htons((uint16_t)sample->dst_as);
+   }
+-  
++
+   pkt.flow.srcMask = (uint8_t)sample->srcMask;
+   pkt.flow.dstMask = (uint8_t)sample->dstMask;
+ 
+@@ -1550,12 +1550,12 @@
+     return;
+   }
+ #endif /* SPOOFSOURCE */
+-  
++
+   /* send non-blocking */
+   send(sfConfig.netFlowOutputSocket, (char *)&pkt, sizeof(pkt), 0);
+- 
++
+ }
+-      
++
+ /*_________________---------------------------__________________
+   _________________   read data fns           __________________
+   -----------------___________________________------------------
+@@ -1563,7 +1563,7 @@
+ 
+ static uint32_t getData32_nobswap(SFSample *sample) {
+   uint32_t ans = *(sample->datap)++;
+-  /* make sure we didn't run off the end of the datagram.  Thanks to 
++  /* make sure we didn't run off the end of the datagram.  Thanks to
+      Sven Eschenberg for spotting a bug/overrun-vulnerabilty that was here before. */
+   if((uint8_t *)sample->datap > sample->endp) {
+     SFABORT(sample, SF_ABORT_EOS);
+@@ -1680,7 +1680,7 @@
+   sample->out_priority = getData32(sample);
+ 
+   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_SWITCH;
+-  
++
+   sf_log(sample,"in_vlan %u\n", sample->in_vlan);
+   sf_log(sample,"in_priority %u\n", sample->in_priority);
+   sf_log(sample,"out_vlan %u\n", sample->out_vlan);
+@@ -1735,9 +1735,9 @@
+     sample->dst_peer_as = ntohl(sample->dst_as_path[0]);
+     sample->dst_as = ntohl(sample->dst_as_path[sample->dst_as_path_len - 1]);
+   }
+-  
++
+   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_GATEWAY;
+-  
++
+   sf_log(sample,"my_as %u\n", sample->my_as);
+   sf_log(sample,"src_as %u\n", sample->src_as);
+   sf_log(sample,"src_peer_as %u\n", sample->src_peer_as);
+@@ -1818,7 +1818,7 @@
+   if(sample->communities_len > 0) sample->communities = sample->datap;
+   /* and skip over it in the input */
+   skipBytes(sample, sample->communities_len * 4);
+- 
++
+   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_GATEWAY;
+   if(sample->communities_len > 0) {
+     uint32_t j = 0;
+@@ -1859,7 +1859,7 @@
+   sample->dst_user_len = getString(sample, sample->dst_user, SA_MAX_EXTENDED_USER_LEN);
+ 
+   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_USER;
+-  
++
+   sf_log(sample,"src_user %s\n", sample->src_user);
+   sf_log(sample,"dst_user %s\n", sample->dst_user);
+ }
+@@ -1899,7 +1899,7 @@
+   if(lstk.depth > 0) lstk.stack = (uint32_t *)sample->datap;
+   /* and skip over it in the input */
+   skipBytes(sample, lstk.depth * 4);
+- 
++
+   if(lstk.depth > 0) {
+     uint32_t j = 0;
+     for(; j < lstk.depth; j++) {
+@@ -1930,7 +1930,7 @@
+ 
+   mplsLabelStack(sample, "mpls_input_stack");
+   mplsLabelStack(sample, "mpls_output_stack");
+-  
++
+   sample->extended_data_tag |= SASAMPLE_EXTENDED_DATA_MPLS;
+ }
+ 
+@@ -1973,7 +1973,7 @@
+ #define SA_MAX_TUNNELNAME_LEN 100
+   char tunnel_name[SA_MAX_TUNNELNAME_LEN+1];
+   uint32_t tunnel_id, tunnel_cos;
+-  
++
+   if(getString(sample, tunnel_name, SA_MAX_TUNNELNAME_LEN) > 0)
+     sf_log(sample,"mpls_tunnel_lsp_name %s\n", tunnel_name);
+   tunnel_id = getData32(sample);
+@@ -2045,7 +2045,7 @@
+   if(lstk.depth > 0) lstk.stack = (uint32_t *)sample->datap;
+   /* and skip over it in the input */
+   skipBytes(sample, lstk.depth * 4);
+- 
++
+   if(lstk.depth > 0) {
+     uint32_t j = 0;
+     for(; j < lstk.depth; j++) {
+@@ -2167,7 +2167,7 @@
+   }
+   sample->headerLen = getData32(sample);
+   sf_log(sample,"headerLen %u\n", sample->headerLen);
+-  
++
+   sample->header = (uint8_t *)sample->datap; /* just point at the header */
+   skipBytes(sample, sample->headerLen);
+   {
+@@ -2175,17 +2175,17 @@
+     printHex(sample->header, sample->headerLen, scratch, 2000, 0, 2000);
+     sf_log(sample,"headerBytes %s\n", scratch);
+   }
+-  
++
+   switch(sample->headerProtocol) {
+     /* the header protocol tells us where to jump into the decode */
+   case SFLHEADER_ETHERNET_ISO8023:
+     decodeLinkLayer(sample);
+     break;
+-  case SFLHEADER_IPv4: 
++  case SFLHEADER_IPv4:
+     sample->gotIPV4 = YES;
+     sample->offsetToIPV4 = 0;
+     break;
+-  case SFLHEADER_IPv6: 
++  case SFLHEADER_IPv6:
+     sample->gotIPV6 = YES;
+     sample->offsetToIPV6 = 0;
+     break;
+@@ -2211,7 +2211,7 @@
+     fprintf(ERROUT, "undefined headerProtocol = %d\n", sample->headerProtocol);
+     exit(-12);
+   }
+-  
++
+   if(sample->gotIPV4) {
+     /* report the size of the original IPPdu (including the IP header) */
+     sf_log(sample,"IPSize %d\n",  sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4);
+@@ -2265,7 +2265,7 @@
+     SFLSampled_ipv4 nfKey;
+     memcpy(&nfKey, sample->header, sizeof(nfKey));
+     sample->sampledPacketSize = ntohl(nfKey.length);
+-    sf_log(sample,"%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize); 
++    sf_log(sample,"%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize);
+     sf_log(sample,"%sIPSize %u\n", prefix,  sample->sampledPacketSize);
+     sample->ipsrc.type = SFLADDRESSTYPE_IP_V4;
+     sample->ipsrc.address.ip_v4 = nfKey.src_ip;
+@@ -2321,8 +2321,8 @@
+     SFLSampled_ipv6 nfKey6;
+     memcpy(&nfKey6, sample->header, sizeof(nfKey6));
+     sample->sampledPacketSize = ntohl(nfKey6.length);
+-    sf_log(sample,"%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize); 
+-    sf_log(sample,"%sIPSize %u\n", prefix, sample->sampledPacketSize); 
++    sf_log(sample,"%ssampledPacketSize %u\n", prefix, sample->sampledPacketSize);
++    sf_log(sample,"%sIPSize %u\n", prefix, sample->sampledPacketSize);
+     sample->ipsrc.type = SFLADDRESSTYPE_IP_V6;
+     memcpy(&sample->ipsrc.address.ip_v6, &nfKey6.src_ip, 16);
+     sample->ipdst.type = SFLADDRESSTYPE_IP_V6;
+@@ -2562,7 +2562,7 @@
+   sf_log(sample,"socket4_remote_ip %s\n", printAddress(&sample->ipdst, buf));
+   sf_log_next32(sample, "socket4_local_port");
+   sf_log_next32(sample, "socket4_remote_port");
+-  
++
+   if(sfConfig.outputFormat == SFLFMT_CLF) {
+     memcpy(sfCLF.client, buf, 50);
+     sfCLF.client[50] = '\0';
+@@ -2682,7 +2682,7 @@
+     sample->ds_index = samplerId & 0x00ffffff;
+     sf_log(sample,"sourceId %u:%u\n", sample->ds_class, sample->ds_index);
+   }
+-  
++
+   sample->meanSkipCount = getData32(sample);
+   sample->samplePool = getData32(sample);
+   sample->dropEvents = getData32(sample);
+@@ -2698,11 +2698,11 @@
+     else sf_log(sample,"outputPort multiple >1\n");
+   }
+   else sf_log(sample,"outputPort %u\n", sample->outputPort);
+-  
++
+   sample->packet_data_tag = getData32(sample);
+-  
++
+   switch(sample->packet_data_tag) {
+-    
++
+   case INMPACKETTYPE_HEADER: readFlowSample_header(sample); break;
+   case INMPACKETTYPE_IPV4:
+     sample->gotIPV4Struct = YES;
+@@ -2887,7 +2887,7 @@
+     }
+   }
+   lengthCheck(sample, "flow_sample", sampleStart, sampleLength);
+-  
++
+   if(sampleFilterOK(sample)) {
+     switch(sfConfig.outputFormat) {
+     case SFLFMT_NETFLOW:
+@@ -2947,7 +2947,7 @@
+   sample->ifCounters.ifOutErrors = sf_log_next32(sample, "ifOutErrors");
+   sample->ifCounters.ifPromiscuousMode = sf_log_next32(sample, "ifPromiscuousMode");
+ }
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_ethernet    __________________
+   -----------------___________________________------------------
+@@ -2968,9 +2968,9 @@
+   sf_log_next32(sample, "dot3StatsFrameTooLongs");
+   sf_log_next32(sample, "dot3StatsInternalMacReceiveErrors");
+   sf_log_next32(sample, "dot3StatsSymbolErrors");
+-}	  
++}
++
+ 
+- 
+ /*_________________---------------------------__________________
+   _________________  readCounters_tokenring   __________________
+   -----------------___________________________------------------
+@@ -2998,7 +2998,7 @@
+   sf_log_next32(sample, "dot5StatsFreqErrors");
+ }
+ 
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_vg          __________________
+   -----------------___________________________------------------
+@@ -3023,7 +3023,7 @@
+ }
+ 
+ 
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_vlan        __________________
+   -----------------___________________________------------------
+@@ -3039,7 +3039,7 @@
+   sf_log_next32(sample, "broadcastPkts");
+   sf_log_next32(sample, "discards");
+ }
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_80211       __________________
+   -----------------___________________________------------------
+@@ -3068,7 +3068,7 @@
+   sf_log_next32(sample, "dot11QoSCFPollsUnusableCount");
+   sf_log_next32(sample, "dot11QoSCFPollsLostCount");
+ }
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_processor   __________________
+   -----------------___________________________------------------
+@@ -3082,7 +3082,7 @@
+   sf_log_next64(sample, "total_memory_bytes");
+   sf_log_next64(sample, "free_memory_bytes");
+ }
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_radio       __________________
+   -----------------___________________________------------------
+@@ -3094,7 +3094,7 @@
+   sf_log_next32(sample, "radio_on_channel_time");
+   sf_log_next32(sample, "radio_on_channel_busy_time");
+ }
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_portName    __________________
+   -----------------___________________________------------------
+@@ -3132,7 +3132,7 @@
+     sf_log(sample,"os_release %s\n", os_release);
+   }
+ }
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_adaptors    __________________
+   -----------------___________________________------------------
+@@ -3156,8 +3156,8 @@
+     }
+   }
+ }
+- 
+- 
++
++
+ /*_________________----------------------------__________________
+   _________________  readCounters_host_parent  __________________
+   -----------------____________________________------------------
+@@ -3200,7 +3200,7 @@
+     sf_log_next32(sample, "cpu_guest_nice");
+   }
+ }
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_host_mem    __________________
+   -----------------___________________________------------------
+@@ -3221,7 +3221,7 @@
+   sf_log_next32(sample, "swap_out");
+ }
+ 
+- 
++
+ /*_________________---------------------------__________________
+   _________________  readCounters_host_dsk    __________________
+   -----------------___________________________------------------
+@@ -3789,7 +3789,7 @@
+   /* now find out what sort of counter blocks we have here... */
+   sample->counterBlockVersion = getData32(sample);
+   sf_log(sample,"counterBlockVersion %u\n", sample->counterBlockVersion);
+-  
++
+   /* first see if we should read the generic stats */
+   switch(sample->counterBlockVersion) {
+   case INMCOUNTERSVERSION_GENERIC:
+@@ -3801,7 +3801,7 @@
+   case INMCOUNTERSVERSION_VLAN: break;
+   default: receiveError(sample, "unknown stats version", YES); break;
+   }
+-  
++
+   /* now see if there are any specific counter blocks to add */
+   switch(sample->counterBlockVersion) {
+   case INMCOUNTERSVERSION_GENERIC: /* nothing more */ break;
+@@ -3831,7 +3831,7 @@
+   sampleLength = getData32(sample);
+   sampleStart = (uint8_t *)sample->datap;
+   sample->samplesGenerated = getData32(sample);
+-  
++
+   sf_log(sample,"sampleSequenceNo %u\n", sample->samplesGenerated);
+   if(expanded) {
+     sample->ds_class = getData32(sample);
+@@ -3843,7 +3843,7 @@
+     sample->ds_index = samplerId & 0x00ffffff;
+   }
+   sf_log(sample,"sourceId %u:%u\n", sample->ds_class, sample->ds_index);
+-  
++
+   num_elements = getData32(sample);
+   {
+     uint32_t el;
+@@ -3855,7 +3855,7 @@
+       sf_log(sample,"counterBlock_tag %s\n", printTag(tag, buf));
+       length = getData32(sample);
+       start = (uint8_t *)sample->datap;
+-      
++
+       switch(tag) {
+       case SFLCOUNTERS_GENERIC: readCounters_generic(sample); break;
+       case SFLCOUNTERS_ETHERNET: readCounters_ethernet(sample); break;
+@@ -3914,7 +3914,7 @@
+   uint32_t samplesInPacket;
+   struct timeval now;
+   char buf[51];
+-  
++
+   /* log some datagram info */
+   now.tv_sec = (long)time(NULL);
+   now.tv_usec = 0;
+@@ -3931,7 +3931,7 @@
+      sample->datagramVersion != 5) {
+     receiveError(sample,  "unexpected datagram version number\n", YES);
+   }
+-  
++
+   /* get the agent address */
+   getAddress(sample, &sample->agent_addr);
+ 
+@@ -3997,15 +3997,15 @@
+     for( ; tgt != NULL; tgt = tgt->nxt) {
+       int bytesSent;
+       if((bytesSent = (uint8_t)sendto(tgt->sock,
+-			     (const char *)sample->rawSample,
+-			     sample->rawSampleLen,
+-			     0,
+-			     (struct sockaddr *)(&tgt->addr),
+-			     sizeof(tgt->addr))) != sample->rawSampleLen) {
+-	fprintf(ERROUT, "sendto returned %d (expected %d): %s\n",
+-		bytesSent,
+-		sample->rawSampleLen,
+-		strerror(errno));
++                                      (const char *)sample->rawSample,
++                                      sample->rawSampleLen,
++                                      0,
++                                      (struct sockaddr *)(&tgt->addr),
++                                      sizeof(tgt->addr))) != sample->rawSampleLen) {
++        fprintf(ERROUT, "sendto returned %d (expected %d): %s\n",
++                bytesSent,
++                sample->rawSampleLen,
++                strerror(errno));
+       }
+     }
+   }
+@@ -4045,7 +4045,7 @@
+   myaddr_in.sin_family = AF_INET;
+   /* myaddr_in6.sin6_addr.s_addr = INADDR_ANY; */
+   myaddr_in.sin_port = htons(port);
+-  
++
+   if ((soc = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+     fprintf(ERROUT, "v4 socket() creation failed, %s\n", strerror(errno));
+     return -1;
+@@ -4087,7 +4087,7 @@
+   myaddr_in6.sin6_family = AF_INET6;
+   /* myaddr_in6.sin6_addr = INADDR_ANY; */
+   myaddr_in6.sin6_port = htons(port);
+-  
++
+   if ((soc = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+     fprintf(ERROUT, "v6 socket() creation failed, %s\n", strerror(errno));
+     exit(-6);
+@@ -4221,7 +4221,7 @@
+       ptr += 2;
+     }
+     break;
+-      
++
+   case DLT_EN10MB:
+   default:
+     /* assume Ethernet header */
+@@ -4248,7 +4248,7 @@
+ 
+   /* now we're just looking for IP */
+   if((uint8_t)(end - ptr) < NFT_MIN_SIZ) return -1; /* not enough for an IPv4 header */
+-  
++
+   /* peek for IPX */
+   if(type_len == 0x0200 || type_len == 0x0201 || type_len == 0x0600) {
+ #define IPX_HDR_LEN 30
+@@ -4260,8 +4260,8 @@
+        ipxLen <= (IPX_HDR_LEN + IPX_MAX_DATA))
+       /* we don't do anything with IPX here */
+       return -1;
+-  } 
+-  
++  }
++
+   if(type_len <= NFT_MAX_8023_LEN) {
+     /* assume 802.3+802.2 header */
+     /* check for SNAP */
+@@ -4292,7 +4292,7 @@
+     }
+   }
+   if(ptr >= end) return -1;
+-  
++
+   /* assume type_len is an ethernet-type now */
+ 
+   if(type_len == 0x0800) {
+@@ -4349,7 +4349,7 @@
+     hdr.caplen = MyByteSwap32(hdr.caplen);
+     hdr.len = MyByteSwap32(hdr.len);
+   }
+-  
++
+   if(fread(buf, hdr.caplen, 1, file) != 1) {
+     fprintf(ERROUT, "unable to read pcap packet from %s : %s\n", sfConfig.readPcapFileName, strerror(errno));
+     exit(-34);
+@@ -4626,7 +4626,7 @@
+       break;
+     case 'e': sfConfig.netFlowPeerAS = YES; break;
+     case 's': sfConfig.disableNetFlowScale = YES; break;
+-#ifdef SPOOFSOURCE      
++#ifdef SPOOFSOURCE
+     case 'S': sfConfig.spoofSource = YES; break;
+ #endif
+     case 'f':
+@@ -4713,7 +4713,7 @@
+       exit(-7);
+     }
+   }
+-    
++
+   /* possible open an output socket for netflow */
+   if(sfConfig.netFlowOutputPort != 0 && sfConfig.netFlowOutputIP.s_addr != 0) openNetFlowSocket();
+   /* if tcpdump format, write the header */
+@@ -4732,10 +4732,10 @@
+       struct timeval timeout;
+       timeout.tv_sec = 0;
+       timeout.tv_usec = 100000;
+-      
++
+       if(soc4 != -1) FD_SET(soc4, &readfds);
+       if(soc6 != -1) FD_SET(soc6, &readfds);
+-      
++
+       nfds = select((soc4 > soc6 ? soc4 : soc6) + 1,
+ 		    &readfds,
+ 		    (fd_set *)NULL,
