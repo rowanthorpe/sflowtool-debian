@@ -8,11 +8,11 @@ Last-Update: 2014-03-03
      else sfConfig.readPcapFile = fopen(sfConfig.readPcapFileName, "rb");
      if(sfConfig.readPcapFile == NULL) {
        fprintf(ERROUT, "cannot open %s : %s\n", sfConfig.readPcapFileName, strerror(errno));
-+      free(sfConfig.readPcapFileName);
++      my_free(sfConfig.readPcapFileName);
        exit(-1);
      }
      readPcapHeader();
-+    free(sfConfig.readPcapFileName);
++    my_free(sfConfig.readPcapFileName);
    }
    else {
      /* open the input socket -- for now it's either a v4 or v6 socket, but in future
