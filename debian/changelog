@@ -1,3 +1,10 @@
+sflowtool (3.35-4) unstable; urgency=medium
+
+  * Define SPOOFSOURCE for compiling the -S flag
+  * Add use-unsigned-short-instead-of-u_short.patch
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Fri, 24 Jul 2015 20:31:48 +0300
+
 sflowtool (3.35-3) unstable; urgency=medium
 
   * Improve coerce-size_t_portably-for-printf.patch
