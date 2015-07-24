@@ -1,3 +1,12 @@
+sflowtool (3.35-3) unstable; urgency=medium
+
+  * Improve coerce-size_t_portably-for-printf.patch
+  * Add
+    make-v6-bind-explicitly-v6only-to-avoid-singlestack-dualstack-issues.patch
+  * Add cosmetic-linting.patch
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Fri, 24 Jul 2015 08:21:26 +0300
+
 sflowtool (3.35-2) unstable; urgency=medium
 
   * Maintenance-notes reminder to specify dist when building
