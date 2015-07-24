@@ -1,15 +1,31 @@
 Description: Coerce size_t to long long unsigned for portable printf
 Forwarded: yes
 Author: Rowan Thorpe <rowan@rowanthorpe.com>
-Last-Update: 2014-07-21
+Last-Update: 2014-07-24
 --- a/src/sflowtool.c
 +++ b/src/sflowtool.c
-@@ -443,7 +443,7 @@
+@@ -440,15 +440,23 @@
+   _________________     heap allocation       __________________
+   -----------------___________________________------------------
+ */
++
++/* absorb compiler warning about long-long and strftime printing */
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wformat"
++#pragma GCC diagnostic ignored "-Wlong-long"
++
  void *my_calloc(size_t bytes) {
    void *mem = calloc(1, bytes);
    if(mem == NULL) {
 -    fprintf(ERROUT, "calloc(%u) failed: %s\n", bytes, strerror(errno));
-+    fprintf(ERROUT, "calloc(%llu) failed: %s\n", (long long unsigned)bytes, strerror(errno));
++    fprintf(ERROUT, "calloc(%"PRIu64") failed: %s\n", (long long unsigned)bytes, strerror(errno));
      exit(-1);
    }
    return mem;
+ }
+ 
++#pragma GCC diagnostic pop
++
+ void my_free(void *ptr) {
+   if(ptr) {
+     free(ptr);
