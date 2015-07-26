@@ -44,7 +44,7 @@ Last-Update: 2015-07-23
    if(bind(soc, (struct sockaddr *)&myaddr_in6, sizeof(struct sockaddr_in6)) == -1) {
      fprintf(ERROUT, "v6 bind() failed, port = %d : %s\n", port, strerror(errno));
 @@ -4677,11 +4702,6 @@
-     free(sfConfig.readPcapFileName);
+     my_free(sfConfig.readPcapFileName);
    }
    else {
 -    /* open the input socket -- for now it's either a v4 or v6 socket, but in future
