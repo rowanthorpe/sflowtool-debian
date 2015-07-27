@@ -35,6 +35,12 @@ sflowtool for Debian
    - gbp dch --distribution=XXXX
    - DIST=XXXX BUILDER=pbuilder gbp buildpackage
    - lintian -E -i -I --pedantic ../sflowtool_X.XX-Y_amd64.changes
+   - optionally test executables with valgrind, e.g:
+      + valgrind --verbose --trace-children=yes --db-attach=yes (--vgdb=full) --track-fds=yes \
+          --read-inline-info=yes --read-var-info=yes --fair-sched=try --leak-check=full \
+          --leak-resolution=high --show-leak-kinds=all --num-callers=40 --track-origins=yes \
+          --keep-stacktraces=alloc-and-free --show-mismatched-frees=yes \
+          sflowtool (--sflowtool-opts)
    - DIST=XXXX BUILDER=pbuilder gbp buildpackage --git-tag
 
  -- Rowan Thorpe <rowan@rowanthorpe.com>, Tue, 21 Jul 2015 16:34:25 +0300
