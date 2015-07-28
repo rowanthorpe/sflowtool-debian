@@ -1,0 +1,515 @@
+Description: Improve ipv6 handling (esp. in forwarder mode)
+Forwarded: yes
+Author: Rowan Thorpe <rowan@rowanthorpe.com>
+Last-Update: 2015-07-27
+--- a/config.h.in
++++ b/config.h.in
+@@ -6,8 +6,8 @@
+ /* Define to 1 if you have the <fcntl.h> header file. */
+ #undef HAVE_FCNTL_H
+ 
+-/* Define to 1 if you have the `gethostbyname' function. */
+-#undef HAVE_GETHOSTBYNAME
++/* Define to 1 if you have the `getaddrinfo' function. */
++#undef HAVE_GETADDRINFO
+ 
+ /* Define to 1 if you have the <inttypes.h> header file. */
+ #undef HAVE_INTTYPES_H
+--- a/configure.ac
++++ b/configure.ac
+@@ -33,7 +33,7 @@
+ AC_FUNC_SELECT_ARGTYPES
+ AC_FUNC_STRFTIME
+ AC_FUNC_VPRINTF
+-AC_CHECK_FUNCS([gethostbyname memset select socket strdup strerror strspn strtol])
++AC_CHECK_FUNCS([getaddrinfo memset select socket strdup strerror strspn strtol])
+ 
+ AC_CONFIG_FILES([Makefile
+                  src/Makefile])
+--- a/configure
++++ b/configure
+@@ -4390,7 +4390,7 @@
+ done
+ 
+ 
+-for ac_func in gethostbyname memset select socket strdup strerror strspn strtol
++for ac_func in getaddrinfo memset select socket strdup strerror strspn strtol
+ do :
+   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+--- a/src/sflowtool.c
++++ b/src/sflowtool.c
+@@ -5,6 +5,8 @@
+ extern "C" {
+ #endif
+ 
++#define _POSIX_C_SOURCE 200809L
++
+ #ifdef WIN32
+ #include "config_windows.h"
+ #else
+@@ -33,6 +35,7 @@
+ #include <netinet/in_systm.h>
+ #include <netinet/in.h>
+ #include <inttypes.h>
++#include <arpa/inet.h>
+ #endif
+ 
+ #include "sflow.h" /* sFlow v5 */
+@@ -163,6 +166,14 @@
+   int sock;
+ } SFForwardingTarget;
+ 
++typedef struct _SFForwardingTarget6 {
++  struct _SFForwardingTarget6 *nxt;
++  struct in6_addr host;
++  uint32_t port;
++  struct sockaddr_in6 addr;
++  int sock;
++} SFForwardingTarget6;
++
+ typedef enum { SFLFMT_FULL=0, SFLFMT_PCAP, SFLFMT_LINE, SFLFMT_NETFLOW, SFLFMT_FWD, SFLFMT_CLF, SFLFMT_SCRIPT } EnumSFLFormat;
+ 
+ typedef struct _SFConfig {
+@@ -192,6 +203,7 @@
+ #endif
+ 
+   SFForwardingTarget *forwardingTargets;
++  SFForwardingTarget6 *forwardingTargets6;
+ 
+   /* vlan filtering */
+   int gotVlanFilter;
+@@ -1376,7 +1388,20 @@
+ 
+ static void sendNetFlowDatagram_spoof(SFSample *sample, NFFlowPkt5 *pkt)
+ {
+-  uint16_t packetLen = sizeof(*pkt) + sizeof(struct myiphdr) + sizeof(struct myudphdr);
++  uint16_t packetLen;
++  char *ptr;
++  struct udpmagichdr {
++    uint32_t src;
++    uint32_t dst;
++    uint8_t zero;
++    uint8_t proto;
++    unsigned short len;
++  } h, saved;
++  int bytesSent;
++  struct sockaddr dest;
++  struct sockaddr_in *to;
++
++  packetLen = sizeof(*pkt) + sizeof(struct myiphdr) + sizeof(struct myudphdr);
+   /* copy the data into the send packet */
+   memcpy(sfConfig.sendPkt.data, (char *)pkt, sizeof(*pkt));
+   /* increment the ip-id */
+@@ -1394,15 +1419,6 @@
+      and blat them in front of the udp header (after saving what was there before).
+      Then compute the udp checksum.  Then patch the saved data back again. */
+   {
+-    char *ptr;
+-    struct udpmagichdr {
+-      uint32_t src;
+-      uint32_t dst;
+-      uint8_t zero;
+-      uint8_t proto;
+-      unsigned short len;
+-    } h, saved;
+-
+     h.src = sfConfig.sendPkt.ip.saddr;
+     h.dst = sfConfig.sendPkt.ip.daddr;
+     h.zero = 0;
+@@ -1424,18 +1440,16 @@
+     memcpy(ptr, &saved, sizeof(struct udpmagichdr));
+ 
+     { /* now send the packet */
+-      int bytesSent;
+-      struct sockaddr dest;
+-      struct sockaddr_in *to = (struct sockaddr_in *)&dest;
++      to = (struct sockaddr_in *)&dest;
+       memset(&dest, 0, sizeof(dest));
+       to->sin_family = AF_INET;
+       to->sin_addr.s_addr = sfConfig.sendPkt.ip.daddr;
+       if((bytesSent = sendto(sfConfig.netFlowOutputSocket,
+-			     &sfConfig.sendPkt,
+-			     packetLen,
+-			     0,
+-			     &dest,
+-			     sizeof(dest))) != packetLen) {
++                         &sfConfig.sendPkt,
++                         packetLen,
++                         0,
++                         &dest,
++                         sizeof(dest))) != packetLen) {
+ 	fprintf(ERROUT, "sendto returned %d (expected %d): %s\n", bytesSent, packetLen, strerror(errno));
+       }
+     }
+@@ -1451,28 +1465,25 @@
+ 
+ static void openNetFlowSocket()
+ {
++  struct sockaddr_in addr;
+ 
+ #ifdef SPOOFSOURCE
+   if(sfConfig.spoofSource) { openNetFlowSocket_spoof(); return; }
+ #endif
+-
+-  {
+-    struct sockaddr_in addr;
+-    memset((char *)&addr,0,sizeof(addr));
+-    addr.sin_family = AF_INET;
+-    addr.sin_port = ntohs(sfConfig.netFlowOutputPort);
+-    addr.sin_addr.s_addr = sfConfig.netFlowOutputIP.s_addr;
+-
+-    /* open an ordinary UDP socket */
+-    if((sfConfig.netFlowOutputSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+-      fprintf(ERROUT, "netflow output socket open failed\n");
+-      exit(-4);
+-    }
+-    /* connect to it so we can just use send() or write() to send on it */
+-    if(connect(sfConfig.netFlowOutputSocket, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+-      fprintf(ERROUT, "connect() to netflow output socket failed\n");
+-      exit(-5);
+-    }
++  memset((char *)&addr,0,sizeof(addr));
++  addr.sin_family = AF_INET;
++  addr.sin_port = ntohs(sfConfig.netFlowOutputPort);
++  addr.sin_addr.s_addr = sfConfig.netFlowOutputIP.s_addr;
++
++  /* open an ordinary UDP socket */
++  if((sfConfig.netFlowOutputSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
++    fprintf(ERROUT, "netflow output socket open failed\n");
++    exit(-4);
++  }
++  /* connect to it so we can just use send() or write() to send on it */
++  if(connect(sfConfig.netFlowOutputSocket, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
++    fprintf(ERROUT, "connect() to netflow output socket failed\n");
++    exit(-5);
+   }
+ }
+ 
+@@ -3990,27 +4001,45 @@
+ 
+ static void receiveSFlowDatagram(SFSample *sample)
+ {
+-  if(sfConfig.forwardingTargets) {
++  SFForwardingTarget *tgt4;
++  SFForwardingTarget6 *tgt6;
++  int bytesSent;
++  int exceptionVal;
++
++  if(sfConfig.forwardingTargets || sfConfig.forwardingTargets6) {
+     /* if we are forwarding, then do nothing else (it might
+        be important from a performance point of view). */
+-    SFForwardingTarget *tgt = sfConfig.forwardingTargets;
+-    for( ; tgt != NULL; tgt = tgt->nxt) {
+-      int bytesSent;
+-      if((bytesSent = (uint8_t)sendto(tgt->sock,
+-                                      (const char *)sample->rawSample,
+-                                      sample->rawSampleLen,
+-                                      0,
+-                                      (struct sockaddr *)(&tgt->addr),
+-                                      sizeof(tgt->addr))) != sample->rawSampleLen) {
+-        fprintf(ERROUT, "sendto returned %d (expected %d): %s\n",
+-                bytesSent,
+-                sample->rawSampleLen,
+-                strerror(errno));
++    if(sfConfig.forwardingTargets) {
++      for(tgt4 = sfConfig.forwardingTargets; tgt4; tgt4 = tgt4->nxt) {
++        if((bytesSent = (uint8_t)sendto(tgt4->sock,
++                                        (const char *)sample->rawSample,
++                                        sample->rawSampleLen,
++                                        0,
++                                        (struct sockaddr *)&tgt4->addr,
++                                        sizeof(tgt4->addr))) != sample->rawSampleLen) {
++          fprintf(ERROUT, "sendto returned %d (expected %d): %s\n",
++                  bytesSent,
++                  sample->rawSampleLen,
++                  strerror(errno));
++        }
+       }
+     }
+-  }
+-  else {
+-    int exceptionVal;
++    if(sfConfig.forwardingTargets6) {
++      for(tgt6 = sfConfig.forwardingTargets6; tgt6; tgt6 = tgt6->nxt) {
++        if((bytesSent = (uint8_t)sendto(tgt6->sock,
++                                        (const char *)sample->rawSample,
++                                        sample->rawSampleLen,
++                                        0,
++                                        (struct sockaddr *)&tgt6->addr,
++                                        sizeof(tgt6->addr))) != sample->rawSampleLen) {
++          fprintf(ERROUT, "sendto returned %d (expected %d): %s\n",
++                  bytesSent,
++                  sample->rawSampleLen,
++                  strerror(errno));
++        }
++      }
++    }
++  } else {
+     sf_log(sample,"startDatagram =================================\n");
+     if((exceptionVal = setjmp(sample->env)) == 0)  {
+       /* TRY */
+@@ -4429,20 +4458,28 @@
+ 
+ static int addForwardingTarget(char *hostandport)
+ {
+-  SFForwardingTarget *tgt = (SFForwardingTarget *)my_calloc(sizeof(SFForwardingTarget));
++  SFForwardingTarget *tgt4;
++  SFForwardingTarget6 *tgt6;
+   /* expect <host>/<port> */
+ #define MAX_HOSTANDPORT_LEN 100
+   char hoststr[MAX_HOSTANDPORT_LEN+1];
+   char *p;
++  int error;
++  struct addrinfo *result;
++  struct addrinfo hints;
++
+   if(hostandport == NULL) {
+     fprintf(ERROUT, "expected <host>/<port>\n");
+     return NO;
+   }
+-  if(strlen(hostandport) > MAX_HOSTANDPORT_LEN) return NO;
++  if(strlen(hostandport) > MAX_HOSTANDPORT_LEN) {
++    fprintf(ERROUT, "<host>/<port> too long\n");
++    return NO;
++  }
+   /* take a copy */
+   strcpy(hoststr, hostandport);
+   /* find the '/' */
+-  for(p = hoststr; *p != '\0'; p++) if(*p == '/') break;
++  for(p = hoststr; *p != '\0' && *p != '/'; p++);
+   if(*p == '\0') {
+     /* not found */
+     fprintf(ERROUT, "host/port - no '/' found\n");
+@@ -4451,35 +4488,72 @@
+   (*p) = '\0'; /* blat in a zero */
+   p++;
+   /* now p points to port string, and hoststr is just the hostname or IP */
+-  {
+-    struct hostent *ent = gethostbyname(hoststr);
+-    if(ent == NULL) {
+-      fprintf(ERROUT, "hostname %s lookup failed\n", hoststr);
+-      return NO;
+-    }
+-    else tgt->host.s_addr = ((struct in_addr *)(ent->h_addr_list[0]))->s_addr;
+-  }
+-  sscanf(p, "%u", &tgt->port);
+-  if(tgt->port <= 0 || tgt->port >= 65535) {
+-    fprintf(ERROUT, "invalid port: %u\n", tgt->port);
++  memset(&hints, 0, sizeof(hints));
++  hints.ai_family = AF_UNSPEC;
++  /*
++    IP (v4 or v6) -> passed as-is
++    hostname      -> first of the IPs returned (whether v4 or v6)
++  */
++  if((error = getaddrinfo(hoststr, NULL, &hints, &result)) != 0 || result == NULL) {
++    if (error != 0)
++        fprintf(ERROUT, "error in getaddrinfo: %s\n", gai_strerror(error));
++    else
++        freeaddrinfo(result);
++    fprintf(ERROUT, "hostname \"%s\" lookup failed\n", hoststr);
+     return NO;
+   }
+-
+-  /* set up the destination socket-address */
+-  tgt->addr.sin_family = AF_INET;
+-  tgt->addr.sin_port = ntohs(tgt->port);
+-  tgt->addr.sin_addr = tgt->host;
+-  /* and open the socket */
+-  if((tgt->sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+-    fprintf(ERROUT, "socket open (for %s) failed: %s", hostandport, strerror(errno));
+-    return NO;
++  if(result->ai_family == AF_INET) {
++    tgt4 = (SFForwardingTarget *)my_calloc(sizeof(SFForwardingTarget));
++    tgt4->host.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
++    sscanf(p, "%u", &tgt4->port);
++    if(tgt4->port <= 0 || tgt4->port >= 65535) {
++      fprintf(ERROUT, "invalid port: %u\n", tgt4->port);
++      my_free(tgt4);
++      freeaddrinfo(result);
++      return NO;
++    }
++    /* set up the destination socket-address */
++    tgt4->addr.sin_family = AF_INET;
++    tgt4->addr.sin_port = ntohs(tgt4->port);
++    tgt4->addr.sin_addr = tgt4->host;
++    /* and open the socket */
++    if((tgt4->sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
++      fprintf(ERROUT, "socket open (for %s) failed: %s", hostandport, strerror(errno));
++      my_free(tgt4);
++      freeaddrinfo(result);
++      return NO;
++    }
++    /* got this far, so must be OK */
++    tgt4->nxt = sfConfig.forwardingTargets;
++    sfConfig.forwardingTargets = tgt4;
++  } else {
++    tgt6 = (SFForwardingTarget6 *)my_calloc(sizeof(SFForwardingTarget6));
++    memcpy(tgt6->host.s6_addr, ((struct sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr, 16);
++    sscanf(p, "%u", &tgt6->port);
++    if(tgt6->port <= 0 || tgt6->port >= 65535) {
++      fprintf(ERROUT, "invalid port: %u\n", tgt6->port);
++      my_free(tgt6);
++      freeaddrinfo(result);
++      return NO;
++    }
++    /* set up the destination socket-address */
++    tgt6->addr.sin6_family = AF_INET6;
++    tgt6->addr.sin6_port = ntohs(tgt6->port);
++    tgt6->addr.sin6_addr = tgt6->host;
++    /* and open the socket */
++    if((tgt6->sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
++      fprintf(ERROUT, "socket open (for %s) failed: %s", hostandport, strerror(errno));
++      my_free(tgt6);
++      freeaddrinfo(result);
++      return NO;
++    }
++    /* got this far, so must be OK */
++    tgt6->nxt = sfConfig.forwardingTargets6;
++    sfConfig.forwardingTargets6 = tgt6;
+   }
+-
+-  /* got this far, so must be OK */
+-  tgt->nxt = sfConfig.forwardingTargets;
+-  sfConfig.forwardingTargets = tgt;
++  freeaddrinfo(result);
+   return YES;
+-}  
++}
+ 
+ /*_________________---------------------------__________________
+   _________________      instructions         __________________
+@@ -4551,6 +4625,9 @@
+   int i;
+   int plus,minus;
+   size_t len_str;
++  int error;
++  struct addrinfo *result;
++  struct addrinfo hints;
+ 
+   /* set defaults */
+   sfConfig.sFlowInputPort = 6343;
+@@ -4562,6 +4639,8 @@
+   sfConfig.listen6 = YES;
+ #endif
+   sfConfig.keepGoing = NO;
++  sfConfig.forwardingTargets = 0;
++  sfConfig.forwardingTargets6 = 0;
+ 
+   /* walk though the args */
+   while (arg < argc) {
+@@ -4611,13 +4690,24 @@
+     case 'z': sfConfig.tcpdumpHdrPad = atoi(argv[arg++]); break;
+     case 'c':
+       {
+-	struct hostent *ent = gethostbyname(argv[arg++]);
+-	if(ent == NULL) {
+-	  fprintf(ERROUT, "netflow collector hostname lookup failed\n");
+-	  exit(-8);
++        memset(&hints, 0, sizeof(hints));
++        hints.ai_family = AF_INET;
++        /*
++          IP (v4)  -> passed as-is
++          hostname -> first of the v4 IPs returned
++        */
++        if((error = getaddrinfo(argv[arg], NULL, &hints, &result)) != 0 || result == NULL) {
++          if (error != 0)
++              fprintf(ERROUT, "error in getaddrinfo: %s\n", gai_strerror(error));
++          else
++              freeaddrinfo(result);
++          fprintf(ERROUT, "netflow collector hostname \"%s\" lookup failed\n", argv[arg]);
++          exit(-8);
+         }
+-    	sfConfig.netFlowOutputIP.s_addr = ((struct in_addr *)(ent->h_addr_list[0]))->s_addr;
+-	sfConfig.outputFormat = SFLFMT_NETFLOW;
++        arg++;
++        sfConfig.netFlowOutputIP.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
++        sfConfig.outputFormat = SFLFMT_NETFLOW;
++        freeaddrinfo(result);
+       }
+       break;
+     case 'd':
+@@ -4674,6 +4764,8 @@
+ int main(int argc, char *argv[])
+ {
+   int32_t soc4=-1,soc6=-1;
++  SFForwardingTarget *tgt4, *nexttgt4;
++  SFForwardingTarget6 *tgt6, *nexttgt6;
+ 
+ #ifdef WIN32
+   WSADATA wsadata;
+@@ -4696,10 +4788,25 @@
+     if(sfConfig.readPcapFile == NULL) {
+       fprintf(ERROUT, "cannot open %s : %s\n", sfConfig.readPcapFileName, strerror(errno));
+       my_free(sfConfig.readPcapFileName);
++      for (tgt4 = sfConfig.forwardingTargets; tgt4; tgt4 = nexttgt4) {
++        nexttgt4 = tgt4->nxt;
++        my_free(tgt4);
++      }
++      for (tgt6 = sfConfig.forwardingTargets6; tgt6; tgt6 = nexttgt6) {
++        nexttgt6 = tgt6->nxt;
++        my_free(tgt6);
++      }
+       exit(-1);
+     }
+     readPcapHeader();
+-    my_free(sfConfig.readPcapFileName);
++    for (tgt4 = sfConfig.forwardingTargets; tgt4; tgt4 = nexttgt4) {
++      nexttgt4 = tgt4->nxt;
++      my_free(tgt4);
++    }
++    for (tgt6 = sfConfig.forwardingTargets6; tgt6; tgt6 = nexttgt6) {
++      nexttgt6 = tgt6->nxt;
++      my_free(tgt6);
++    }
+   }
+   else {
+     if(sfConfig.listen6) {
+@@ -4710,6 +4817,14 @@
+     }
+     if(soc4 == -1 && soc6 == -1) {
+       fprintf(ERROUT, "unable to open UDP read socket\n");
++      for (tgt4 = sfConfig.forwardingTargets; tgt4; tgt4 = nexttgt4) {
++        nexttgt4 = tgt4->nxt;
++        my_free(tgt4);
++      }
++      for (tgt6 = sfConfig.forwardingTargets6; tgt6; tgt6 = nexttgt6) {
++        nexttgt6 = tgt6->nxt;
++        my_free(tgt6);
++      }
+       exit(-7);
+     }
+   }
+@@ -4757,6 +4872,14 @@
+ 	  (void)select(1, NULL, NULL, NULL, &timeout);
+ 	}
+ 	else {
++          for (tgt4 = sfConfig.forwardingTargets; tgt4; tgt4 = nexttgt4) {
++            nexttgt4 = tgt4->nxt;
++            my_free(tgt4);
++          }
++          for (tgt6 = sfConfig.forwardingTargets6; tgt6; tgt6 = nexttgt6) {
++            nexttgt6 = tgt6->nxt;
++            my_free(tgt6);
++          }
+           exit(-9);
+ 	}
+       }
+@@ -4766,7 +4889,16 @@
+       }
+     }
+   }
+-  return 0;
++  my_free(sfConfig.readPcapFileName);
++  for (tgt4 = sfConfig.forwardingTargets; tgt4; tgt4 = nexttgt4) {
++    nexttgt4 = tgt4->nxt;
++    my_free(tgt4);
++  }
++  for (tgt6 = sfConfig.forwardingTargets6; tgt6; tgt6 = nexttgt6) {
++    nexttgt6 = tgt6->nxt;
++    my_free(tgt6);
++  }
++  exit(0);
+ }
+ 
+ 
