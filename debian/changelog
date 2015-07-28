@@ -1,3 +1,13 @@
+sflowtool (3.35-5) unstable; urgency=medium
+
+  * Improve fix-strdup-mem-leak.patch
+  * Refresh
+    make-v6-bind-explicitly-v6only-to-avoid-singlestack-dualstack-issues.patch
+  * Add valgrind example to maintenance-notes
+  * Add improve-ipv6-handling.patch
+
+ -- Rowan Thorpe <rowan@rowanthorpe.com>  Tue, 28 Jul 2015 20:00:56 +0300
+
 sflowtool (3.35-4) unstable; urgency=medium
 
   * Define SPOOFSOURCE for compiling the -S flag
